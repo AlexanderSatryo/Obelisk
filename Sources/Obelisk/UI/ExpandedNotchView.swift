@@ -64,11 +64,6 @@ public struct ExpandedNotchView: View {
             VStack(spacing: 6) {
                 // Header bar placed completely below the physical MacBook Pro M5 notch
             HStack(spacing: 12) {
-                Text("OBELISK")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white.opacity(0.9))
-                    .tracking(1.4)
-
                 // Pure Floating Navigation Tabs (User's Icons + Active Accent Dot)
                 HStack(spacing: 12) {
                     ForEach(settings.enabledTabs, id: \.rawValue) { tab in

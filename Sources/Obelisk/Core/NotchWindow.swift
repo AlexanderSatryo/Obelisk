@@ -237,7 +237,7 @@ public final class NotchHostingView<Content: View>: NSHostingView<Content> {
             if !wm.isExpanded {
                 wm.expand(openingTab: .file)
             } else if wm.currentTab != .file {
-                wm.switchToTab(.file)
+                wm.switchToTab(.file, updateLastActiveTab: false)
             }
         }
         return .copy
@@ -267,8 +267,7 @@ public final class NotchHostingView<Content: View>: NSHostingView<Content> {
 
     public override func hitTest(_ point: NSPoint) -> NSView? {
         let wm = WindowManager.shared
-        guard wm.isExpanded else { return nil }
-        let visibleSize = wm.expandedSize
+        let visibleSize = wm.isExpanded ? wm.expandedSize : wm.currentCompactSize
         let notchRect = NSRect(
             x: bounds.midX - (visibleSize.width / 2.0),
             y: bounds.maxY - visibleSize.height,

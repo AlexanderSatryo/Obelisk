@@ -1708,13 +1708,6 @@ public struct SettingsView: View {
         VStack(spacing: 5) {
             // Header Bar
             HStack {
-                Text("OBELISK")
-                    .font(.system(size: 8.5, weight: .bold))
-                    .foregroundColor(.white.opacity(0.85))
-                    .tracking(0.8)
-
-                Spacer()
-
                 HStack(spacing: 4) {
                     ForEach(draftToUse.enabledTabs, id: \.rawValue) { tab in
                         ZStack {

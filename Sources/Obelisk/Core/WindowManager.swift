@@ -238,7 +238,12 @@ public final class WindowManager: ObservableObject {
                 settings.enableFileTab = true
             }
             self.currentTab = tab
-            settings.lastActiveTab = tab
+            // When opening explicitly for file drop (openingTab == .file),
+            // do NOT overwrite the user's remembered lastActiveTab!
+            // settings.lastActiveTab preserves the user's manual preference (e.g. .media).
+            if tab != .file {
+                settings.lastActiveTab = tab
+            }
         } else {
             applyDefaultOpeningTabIfNeeded(settings: settings)
         }
@@ -376,31 +381,35 @@ public final class WindowManager: ObservableObject {
 
     private static var lastConsumedDragChangeCount: Int = NSPasteboard(name: .drag).changeCount
 
-    /// Determines whether the user is actively dragging one or more files in macOS
+    public static func syncDragPasteboardChangeCount() {
+        lastConsumedDragChangeCount = NSPasteboard(name: .drag).changeCount
+    }
+
+    /// Determines whether the user is actively dragging one or more files/folders in macOS
     /// (e.g. from Finder, Desktop, or fullscreen app).
     public static var isSystemDraggingFiles: Bool {
         let isMouseDown = (NSEvent.pressedMouseButtons & 1) != 0
-        let pboard = NSPasteboard(name: .drag)
-        let currentCount = pboard.changeCount
-
         guard isMouseDown else {
-            // When mouse is not pressed, any previous drag operation is complete
-            lastConsumedDragChangeCount = currentCount
+            syncDragPasteboardChangeCount()
             return false
         }
+
+        let pboard = NSPasteboard(name: .drag)
+        let currentCount = pboard.changeCount
 
         // Only consider it a file drag if a new drag was initiated (changeCount incremented)
         guard currentCount != lastConsumedDragChangeCount else {
             return false
         }
 
-        guard let types = pboard.types else { return false }
-        return types.contains {
-            $0 == .fileURL ||
-            $0.rawValue.contains("file-url") ||
-            $0.rawValue.contains("NSFilenamesPboardType") ||
-            $0.rawValue.contains("promised-file")
+        // Verify that real file/folder URLs exist on the drag pasteboard
+        guard let urls = pboard.readObjects(forClasses: [NSURL.self], options: [
+            NSPasteboard.ReadingOptionKey.urlReadingFileURLsOnly: true
+        ]) as? [URL], !urls.isEmpty else {
+            return false
         }
+
+        return true
     }
 
     /// Evaluates whether the global pointer is within the compact notch interaction threshold.
@@ -413,21 +422,26 @@ public final class WindowManager: ObservableObject {
         let mouseLoc = NSEvent.mouseLocation
         let isMouseDown = (NSEvent.pressedMouseButtons & 1) != 0
 
+        // Synchronize drag pasteboard changeCount whenever mouse is NOT held down,
+        // ensuring stale pasteboards from prior drags never trigger a false positive.
+        if !isMouseDown {
+            Self.syncDragPasteboardChangeCount()
+        }
+
         // 1. Proactive File Drag Approach Detection
-        // When the user drags a file towards the notch bezel, immediately expand into the File Tray tab
+        // When the user drags a file/folder towards the notch bezel, immediately expand into the File Tray tab
         // with ZERO dwell latency and activate mouse events on the window.
-        // This welcomes the dragged file instantly and completely prevents macOS WindowServer / Dock
-        // from triggering the Mission Control Spaces bar at the top edge of desktop or fullscreen apps.
         if isMouseDown && Self.isSystemDraggingFiles, let screen = ScreenGeometry.currentScreen {
             let screenFrame = screen.frame
             let approachWidth = max(expandedSize.width * 0.75, 360.0)
             let approachZone = NSRect(
                 x: screenFrame.midX - (approachWidth / 2.0),
-                y: screenFrame.maxY - 110.0,
+                y: screenFrame.maxY - 75.0,
                 width: approachWidth,
-                height: 110.0
+                height: 75.0
             )
             if approachZone.contains(mouseLoc) {
+                Self.syncDragPasteboardChangeCount()
                 hoverStartTime = nil
                 self.window?.ignoresMouseEvents = false
                 self.expand(openingTab: .file)
@@ -580,14 +594,16 @@ public final class WindowManager: ObservableObject {
     }
 
     /// Switches directly to the specified tab and updates the container height.
-    public func switchToTab(_ tab: ObeliskTab) {
+    public func switchToTab(_ tab: ObeliskTab, updateLastActiveTab: Bool = true) {
         if tab == .weather {
             WeatherService.shared.fetchWeather()
         }
         let resp = ObeliskSettings.shared.animationSpeed.expandResponse
         withAnimation(.spring(response: resp, dampingFraction: 0.82)) {
             self.currentTab = tab
-            ObeliskSettings.shared.lastActiveTab = tab
+            if updateLastActiveTab {
+                ObeliskSettings.shared.lastActiveTab = tab
+            }
             self.updateHeightForCurrentTab()
         }
     }

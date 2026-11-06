@@ -23,6 +23,7 @@ CACHEDIR.TAG
 *.dSYM.zip
 *.app
 *.ipa
+*.dmg
 
 # ==========================================
 # Xcode & IDE Configs
@@ -57,4 +58,10 @@ xcuserdata/
 *.log
 *.tmp
 .system_generated/
+
+# ==========================================
+# Design Assets & Local Branding
+# ==========================================
+Obelisk Logo/
+Obelisk\ Logo/
 
