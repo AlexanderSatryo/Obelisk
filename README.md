@@ -42,66 +42,24 @@ Obelisk is a native macOS utility built with Swift and SwiftUI for Apple Silicon
 
 ---
 
-## Installation Guide
+## Installation
 
-### Option 1: Install via `.dmg` (Recommended)
+### 1. Download `.dmg`
+Download the latest **`Obelisk.dmg`** installer directly from GitHub Releases:
 
-1. **Download the Installer:**
-   - Get the latest **`Obelisk.dmg`** from the repository releases or project folder.
-2. **Install to Applications:**
-   - Double-click **`Obelisk.dmg`** to mount the installer window.
-   - Drag **`Obelisk.app`** into the **`Applications`** folder shortcut.
-   - Eject the disk image once copying is complete.
-3. **First-Time Launch (macOS Gatekeeper):**
-   - Open your **Applications** folder in Finder.
-   - **Right-click** on **`Obelisk.app`** $\rightarrow$ select **Open** $\rightarrow$ click **Open Anyway**.
-     *(You only need to do this once. Alternatively, run: `xattr -cr /Applications/Obelisk.app` in Terminal).*
-4. **Grant System Permissions:**
-   - Click **Allow** when prompted for Calendar and Location permissions so Obelisk can display your agenda and local weather.
+👉 **[Download Obelisk.dmg (Latest Release)](https://github.com/AlexanderSatryo/Obelisk/releases/latest/download/Obelisk.dmg)**
 
----
+### 2. Install to Applications
+1. Double-click the downloaded **`Obelisk.dmg`** to open the installer window.
+2. Drag the **`Obelisk`** icon into the **`Applications`** folder shortcut.
+3. Eject the disk image.
 
-### Option 2: Build From Source (Developers)
-
-#### Prerequisites
-- macOS 13.0 (Ventura) or later (Apple Silicon M-series recommended)
-- Xcode Command Line Tools (`xcode-select --install`)
-- Swift 5.9+
-
-#### Build Release Binary & Bundle
-
-```bash
-# 1. Clone repository
-git clone https://github.com/USERNAME/Obelisk.git
-cd Obelisk
-
-# 2. Compile optimized production release build
-swift build -c release
-
-# 3. Create standalone .app bundle
-STAGING="/tmp/Obelisk-Staging"
-mkdir -p "$STAGING/Obelisk.app/Contents/MacOS"
-mkdir -p "$STAGING/Obelisk.app/Contents/Resources"
-
-cp ".build/out/Products/Release/Obelisk" "$STAGING/Obelisk.app/Contents/MacOS/Obelisk"
-cp "Info.plist" "$STAGING/Obelisk.app/Contents/Info.plist"
-echo -n "APPL????" > "$STAGING/Obelisk.app/Contents/PkgInfo"
-
-# 4. Sign the bundle ad-hoc
-codesign --force --deep --sign - "$STAGING/Obelisk.app"
-
-# 5. Move into Applications
-cp -R "$STAGING/Obelisk.app" /Applications/
-```
-
-#### Generate `.dmg` Installer Package
-
-```bash
-mkdir -p /tmp/DMG-Staging
-cp -R /tmp/Obelisk-Staging/Obelisk.app /tmp/DMG-Staging/
-ln -s /Applications /tmp/DMG-Staging/Applications
-hdiutil create -volname "Obelisk" -srcfolder /tmp/DMG-Staging -ov -format UDZO Obelisk.dmg
-```
+### 3. First-Time Launch (macOS Gatekeeper)
+Because Obelisk is an independent open-source utility built for Apple Silicon:
+1. Open your **Applications** folder in Finder.
+2. **Right-click** on **`Obelisk`** $\rightarrow$ select **Open** $\rightarrow$ click **Open Anyway**.
+   *(You only need to do this once. Alternatively, run: `xattr -cr /Applications/Obelisk.app` in Terminal).*
+3. Click **Allow** when prompted for Calendar and Location permissions so Obelisk can display your agenda and local weather.
 
 ---
 
