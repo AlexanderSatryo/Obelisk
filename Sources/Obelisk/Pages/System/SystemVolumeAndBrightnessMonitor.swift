@@ -1,0 +1,206 @@
+import Foundation
+import CoreAudio
+import AudioToolbox
+import CoreGraphics
+
+/// Monitors macOS system output volume, mute state, and built-in display brightness.
+/// Dispatches transient HUD bars on the notch (both in standby and extended mode)
+/// whenever the user adjusts volume or brightness (+ / -).
+public final class SystemVolumeAndBrightnessMonitor {
+    public static let shared = SystemVolumeAndBrightnessMonitor()
+
+    private var lastVolume: Float32 = -1
+    private var lastMute: Bool = false
+    private var lastBrightness: Float = -1
+    private var isInitialized: Bool = false
+    private var pollTimer: Timer?
+
+    private typealias DisplayServicesGetBrightnessFunc = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
+    private var getBrightnessFn: DisplayServicesGetBrightnessFunc?
+
+    private init() {
+        if let handle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY) {
+            if let sym = dlsym(handle, "DisplayServicesGetBrightness") {
+                self.getBrightnessFn = unsafeBitCast(sym, to: DisplayServicesGetBrightnessFunc.self)
+            }
+        }
+    }
+
+    /// Begins monitoring volume and display brightness changes.
+    public func startMonitoring() {
+        let (vol, mute) = readCurrentAudioState()
+        self.lastVolume = vol
+        self.lastMute = mute
+        self.lastBrightness = readCurrentBrightness()
+        self.isInitialized = true
+
+        setupAudioListener()
+        startPolling()
+    }
+
+    private func setupAudioListener() {
+        let devID = defaultOutputDeviceID()
+        guard devID != 0 else { return }
+
+        var volAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
+            mScope: kAudioObjectPropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        _ = AudioObjectAddPropertyListenerBlock(devID, &volAddr, DispatchQueue.main) { [weak self] _, _ in
+            self?.checkHardwareChanges()
+        }
+
+        var scalarAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioObjectPropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        _ = AudioObjectAddPropertyListenerBlock(devID, &scalarAddr, DispatchQueue.main) { [weak self] _, _ in
+            self?.checkHardwareChanges()
+        }
+
+        var muteAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioObjectPropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        _ = AudioObjectAddPropertyListenerBlock(devID, &muteAddr, DispatchQueue.main) { [weak self] _, _ in
+            self?.checkHardwareChanges()
+        }
+
+        // Listen for default output device changes (e.g. plugging in headphones or connecting AirPods)
+        var defaultDevAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        _ = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &defaultDevAddr, DispatchQueue.main) { [weak self] _, _ in
+            self?.setupAudioListener()
+            self?.checkHardwareChanges()
+        }
+    }
+
+    private func startPolling() {
+        pollTimer?.invalidate()
+        // Fast 35ms polling interval (approx. 30 FPS) for buttery smooth brightness and audio tracking
+        let timer = Timer(timeInterval: 0.035, repeats: true) { [weak self] _ in
+            self?.checkHardwareChanges()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.pollTimer = timer
+    }
+
+    private func checkHardwareChanges() {
+        guard isInitialized else { return }
+
+        // 1. Check Volume & Mute
+        let (vol, mute) = readCurrentAudioState()
+        let volDiff = abs(vol - lastVolume)
+        let volChanged = volDiff > 0.005
+        let muteChanged = (mute != lastMute)
+
+        if volChanged || muteChanged {
+            self.lastVolume = vol
+            self.lastMute = mute
+            Task { @MainActor in
+                HardwareTelemetryService.shared.triggerTransientHUD(
+                    .volume(level: Double(vol), isMuted: mute),
+                    duration: 1.8
+                )
+            }
+        }
+
+        // 2. Check Display Brightness
+        let brightness = readCurrentBrightness()
+        if brightness >= 0 {
+            let brightDiff = abs(brightness - lastBrightness)
+            if brightDiff > 0.005 {
+                self.lastBrightness = brightness
+
+                Task { @MainActor in
+                    // If charger was recently connected or battery charging HUD is active, ignore brightness auto-ramp
+                    let timeSincePlug = Date().timeIntervalSince(HardwareTelemetryService.shared.lastChargerConnectionTime)
+                    let isRecentChargerPlug = timeSincePlug >= 0 && timeSincePlug < 3.5
+                    let isBatteryChargingHUDActive: Bool = {
+                        if let hud = HardwareTelemetryService.shared.activeTransientHUD,
+                           case .battery(_, let isCharging, _) = hud, isCharging {
+                            return true
+                        }
+                        return false
+                    }()
+
+                    guard !isRecentChargerPlug && !isBatteryChargingHUDActive else {
+                        return
+                    }
+
+                    HardwareTelemetryService.shared.triggerTransientHUD(
+                        .brightness(level: Double(brightness)),
+                        duration: 1.8
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Audio Volume & Mute Helpers
+
+    private func defaultOutputDeviceID() -> AudioDeviceID {
+        var devID = AudioDeviceID(0)
+        var devSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var devAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &devAddr,
+            0,
+            nil,
+            &devSize,
+            &devID
+        )
+        return (status == noErr) ? devID : 0
+    }
+
+    private func readCurrentAudioState() -> (volume: Float32, isMuted: Bool) {
+        let devID = defaultOutputDeviceID()
+        guard devID != 0 else { return (0.5, false) }
+
+        var vol: Float32 = 0
+        var volSize = UInt32(MemoryLayout<Float32>.size)
+        var volAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
+            mScope: kAudioObjectPropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var status = AudioObjectGetPropertyData(devID, &volAddr, 0, nil, &volSize, &vol)
+        if status != noErr {
+            volAddr.mSelector = kAudioDevicePropertyVolumeScalar
+            status = AudioObjectGetPropertyData(devID, &volAddr, 0, nil, &volSize, &vol)
+        }
+
+        var mute: UInt32 = 0
+        var muteSize = UInt32(MemoryLayout<UInt32>.size)
+        var muteAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioObjectPropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        _ = AudioObjectGetPropertyData(devID, &muteAddr, 0, nil, &muteSize, &mute)
+
+        return (max(0, min(1.0, vol)), mute != 0)
+    }
+
+    // MARK: - Display Brightness Helper
+
+    private func readCurrentBrightness() -> Float {
+        guard let fn = getBrightnessFn else { return -1 }
+        var brightness: Float = 0
+        let status = fn(CGMainDisplayID(), &brightness)
+        return (status == 0) ? max(0, min(1.0, brightness)) : -1
+    }
+}
+

@@ -1,0 +1,60 @@
+# ==========================================
+# macOS System Files
+# ==========================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon\r\r
+._*
+.Spotlight-V100
+.Trashes
+
+# ==========================================
+# Swift Package Manager (SPM) & Build Files
+# ==========================================
+.build/
+.swiftpm/
+DerivedData/
+*.buildSystem_*
+CACHEDIR.TAG
+
+# Binary products & symbols
+*.dSYM/
+*.dSYM.zip
+*.app
+*.ipa
+
+# ==========================================
+# Xcode & IDE Configs
+# ==========================================
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcuserdatad
+xcuserdata/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+*.xcuserstate
+
+# Visual Studio Code & JetBrains
+.vscode/
+.idea/
+
+# ==========================================
+# Environment & Sensitive Keys
+# ==========================================
+.env
+.env.*
+*.key
+*.pem
+*.certificate
+*.p8
+*.p12
+
+# ==========================================
+# Temporary & Log Files
+# ==========================================
+*.log
+*.tmp
+.system_generated/
+

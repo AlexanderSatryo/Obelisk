@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.alxstry.obelisk</string>
+    <key>CFBundleName</key>
+    <string>Obelisk</string>
+    <key>CFBundleExecutable</key>
+    <string>Obelisk</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Obelisk uses your device location to provide accurate local weather forecasts on your MacBook notch.</string>
+    <key>NSLocationUsageDescription</key>
+    <string>Obelisk uses your device location to provide accurate local weather forecasts on your MacBook notch.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Obelisk uses your built-in camera to display the Quick Camera Mirror inside the notch.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Obelisk accesses microphone state to provide instant mute/unmute controls and privacy status indicators.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Obelisk uses Bluetooth to detect connected earbuds and headphones (such as Samsung Galaxy Buds and AirPods) and display battery telemetry.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Obelisk accesses your calendar to display upcoming events and schedules inside the notch.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Obelisk accesses your calendar to display upcoming events and schedules inside the notch.</string>
+    <key>NSFocusStatusUsageDescription</key>
+    <string>Obelisk accesses your Focus status to display the active focus mode (Do Not Disturb, Work, Sleep) on your MacBook notch.</string>
+</dict>
+</plist>
+
