@@ -1001,6 +1001,13 @@ public struct SettingsView: View {
                         isHighlighted: matchesCurrentQuery("fileModule"),
                         isOn: $draft.enableFileTab
                     )
+
+                    PreferenceToggleRow(
+                        title: "Notifications",
+                        subtitle: "Recent notifications history and alert center",
+                        isHighlighted: matchesCurrentQuery("notifications") || matchesCurrentQuery("modules"),
+                        isOn: $draft.enableNotificationTab
+                    )
                 }
             }
 
@@ -2029,6 +2036,34 @@ public struct SettingsView: View {
                     .padding(5)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.blue.opacity(0.3), lineWidth: 0.5))
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal, 10)
+                .brightness((draftToUse.colorBrightness - 1.0) * 0.40)
+
+            case .notification:
+                HStack(spacing: 6) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "bell.badge.fill").font(.system(size: 6.5, weight: .bold)).foregroundColor(Color(red: 52/255, green: 199/255, blue: 89/255))
+                            Text("Notifications").font(.system(size: 6.5, weight: .bold)).foregroundColor(.white)
+                            Spacer()
+                            Text("3").font(.system(size: 5.5, weight: .bold)).foregroundColor(.white.opacity(0.7))
+                        }
+                        VStack(alignment: .leading, spacing: 1.5) {
+                            HStack(spacing: 3) {
+                                Circle().fill(Color.green).frame(width: 4, height: 4)
+                                Text("WhatsApp • Sarah Jenkins").font(.system(size: 5.5, weight: .medium)).foregroundColor(.white.opacity(0.85)).lineLimit(1)
+                            }
+                            HStack(spacing: 3) {
+                                Circle().fill(Color.blue).frame(width: 4, height: 4)
+                                Text("Mail • Alexander Satryo").font(.system(size: 5.5, weight: .medium)).foregroundColor(.white.opacity(0.85)).lineLimit(1)
+                            }
+                        }
+                    }
+                    .padding(5)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
                     .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 10)

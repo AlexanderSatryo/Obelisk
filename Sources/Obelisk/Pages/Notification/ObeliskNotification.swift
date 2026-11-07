@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 /// Represents an incoming rich notification displayed via the Dynamic Island notch HUD.
-public struct ObeliskNotification: Identifiable, Equatable {
+public struct ObeliskNotification: Identifiable, Equatable, Codable {
     public let id: UUID
     public let appName: String
     public let bundleIdentifier: String
@@ -11,6 +11,10 @@ public struct ObeliskNotification: Identifiable, Equatable {
     public let timestamp: Date
     public let appIcon: NSImage?
     public let appURL: URL?
+
+    enum CodingKeys: String, CodingKey {
+        case id, appName, bundleIdentifier, sender, message, timestamp
+    }
 
     public init(
         id: UUID = UUID(),
@@ -32,6 +36,47 @@ public struct ObeliskNotification: Identifiable, Equatable {
         let resolvedURL = appURL ?? ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: appName)
         self.appURL = resolvedURL
         self.appIcon = appIcon ?? ObeliskNotification.resolveIcon(url: resolvedURL, bundleIdentifier: bundleIdentifier, appName: appName)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.appName = try container.decode(String.self, forKey: .appName)
+        self.bundleIdentifier = try container.decode(String.self, forKey: .bundleIdentifier)
+        self.sender = try container.decode(String.self, forKey: .sender)
+        self.message = try container.decode(String.self, forKey: .message)
+        self.timestamp = try container.decode(Date.self, forKey: .timestamp)
+
+        let resolvedURL = ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: appName)
+        self.appURL = resolvedURL
+        self.appIcon = ObeliskNotification.resolveIcon(url: resolvedURL, bundleIdentifier: bundleIdentifier, appName: appName)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(appName, forKey: .appName)
+        try container.encode(bundleIdentifier, forKey: .bundleIdentifier)
+        try container.encode(sender, forKey: .sender)
+        try container.encode(message, forKey: .message)
+        try container.encode(timestamp, forKey: .timestamp)
+    }
+
+    public var formattedTimeAgo: String {
+        let seconds = Int(-timestamp.timeIntervalSinceNow)
+        if seconds < 60 {
+            return "Just now"
+        } else if seconds < 3600 {
+            let mins = max(1, seconds / 60)
+            return "\(mins)m ago"
+        } else if seconds < 86400 {
+            let hours = seconds / 3600
+            return "\(hours)h ago"
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "d MMM"
+            return formatter.string(from: timestamp)
+        }
     }
 
     public static func == (lhs: ObeliskNotification, rhs: ObeliskNotification) -> Bool {
@@ -88,3 +133,4 @@ public struct ObeliskNotification: Identifiable, Equatable {
         return nil
     }
 }
+

@@ -107,28 +107,33 @@ public struct RootView: View {
     public var body: some View {
         ZStack(alignment: .top) {
             ZStack(alignment: .top) {
-                if let notif = notificationService.activeNotification {
+                if showsExpanded {
+                    // Expanded Dashboard (multi-tab: Media, Weather, Calendar, File, Notifications)
+                    ExpandedNotchView(windowManager: windowManager)
+                        .transition(
+                            .opacity.combined(
+                                with: .scale(scale: 0.96, anchor: .top)
+                            )
+                        )
+
+                    // Transient HUD (earbuds, charging) rendered inside the top notch body
+                    if let hud = HardwareTelemetryService.shared.activeTransientHUD {
+                        NotchTransientHUDBar(hud: hud, isExpanded: true)
+                            .transition(.opacity)
+                    }
+                } else if let notif = notificationService.activeNotification {
+                    // Dynamic Island notification wings / unlocked card when collapsed
                     NotificationNotchView(notification: notif, windowManager: windowManager)
                         .transition(.opacity)
                 } else {
                     // Compact Wings (visible when collapsed and transient HUD is not active)
                     CompactNotchView(windowManager: windowManager)
-                        .opacity((showsExpanded || HardwareTelemetryService.shared.activeTransientHUD != nil) ? 0 : 1)
-                        .allowsHitTesting(!showsExpanded && HardwareTelemetryService.shared.activeTransientHUD == nil)
+                        .opacity(HardwareTelemetryService.shared.activeTransientHUD != nil ? 0 : 1)
+                        .allowsHitTesting(HardwareTelemetryService.shared.activeTransientHUD == nil)
 
-                    // Expanded Dashboard (smoothly fades & scales in from the top bezel)
-                    if showsExpanded {
-                        ExpandedNotchView(windowManager: windowManager)
-                            .transition(
-                                .opacity.combined(
-                                    with: .scale(scale: 0.96, anchor: .top)
-                                )
-                            )
-                    }
-
-                    // Transient HUD (earbuds, charging) - ALWAYS rendered inside the top notch body, whether expanded or collapsed!
+                    // Transient HUD (earbuds, charging)
                     if let hud = HardwareTelemetryService.shared.activeTransientHUD {
-                        NotchTransientHUDBar(hud: hud, isExpanded: showsExpanded)
+                        NotchTransientHUDBar(hud: hud, isExpanded: false)
                             .transition(.opacity)
                     }
                 }
@@ -145,14 +150,14 @@ public struct RootView: View {
             .pointingHandCursor()
             .onTapGesture {
                 guard !ScreenGeometry.isMissionControlActive() else { return }
-                if notificationService.activeNotification != nil {
-                    if !notificationService.isCardExpanded {
-                        notificationService.handleNotchTap()
+                if !windowManager.isExpanded {
+                    if notificationService.activeNotification != nil {
+                        if !notificationService.isCardExpanded {
+                            notificationService.handleNotchTap()
+                        }
+                    } else if settings.triggerMode != .hoverOnly {
+                        windowManager.expand()
                     }
-                    return
-                }
-                if !windowManager.isExpanded && settings.triggerMode != .hoverOnly {
-                    windowManager.expand()
                 }
             }
         }

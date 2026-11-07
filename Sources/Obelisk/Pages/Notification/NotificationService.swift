@@ -10,10 +10,12 @@ public final class NotificationService: ObservableObject {
 
     @Published public var activeNotification: ObeliskNotification? = nil
     @Published public var isCardExpanded: Bool = false
+    @Published public var recentNotifications: [ObeliskNotification] = []
 
     private var autoDismissWorkItem: DispatchWorkItem?
 
     private init() {
+        loadRecentNotifications()
         setupDistributedNotificationListener()
     }
 
@@ -54,6 +56,14 @@ public final class NotificationService: ObservableObject {
         // Lock biometrics for incoming private notifications
         BiometricPrivacyService.shared.lock()
         self.isCardExpanded = false
+
+        // Archive into recent notifications history
+        recentNotifications.removeAll { $0.id == notification.id }
+        recentNotifications.insert(notification, at: 0)
+        if recentNotifications.count > 30 {
+            recentNotifications = Array(recentNotifications.prefix(30))
+        }
+        saveRecentNotifications()
 
         withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
             self.activeNotification = notification
@@ -117,7 +127,12 @@ public final class NotificationService: ObservableObject {
     /// Opens the application associated with the active notification and dismisses the notch card.
     public func openApp() {
         guard let notification = activeNotification else { return }
+        openNotificationApp(notification)
+        dismissNotification()
+    }
 
+    /// Opens the application for any notification item in the history feed.
+    public func openNotificationApp(_ notification: ObeliskNotification) {
         if let appURL = notification.appURL ?? (notification.bundleIdentifier.isEmpty ? nil : NSWorkspace.shared.urlForApplication(withBundleIdentifier: notification.bundleIdentifier)) {
             let config = NSWorkspace.OpenConfiguration()
             config.activates = true
@@ -127,8 +142,41 @@ public final class NotificationService: ObservableObject {
         }) {
             running.activate(options: .activateIgnoringOtherApps)
         }
+    }
 
-        dismissNotification()
+    /// Removes a specific notification from recent history.
+    public func removeRecentNotification(id: UUID) {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+            recentNotifications.removeAll { $0.id == id }
+            saveRecentNotifications()
+        }
+    }
+
+    /// Clears all recent notifications from history.
+    public func clearAllRecentNotifications() {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+            recentNotifications.removeAll()
+            saveRecentNotifications()
+        }
+    }
+
+    private func loadRecentNotifications() {
+        guard let data = UserDefaults.standard.data(forKey: "cfg_recentNotifications") else { return }
+        do {
+            let decoded = try JSONDecoder().decode([ObeliskNotification].self, from: data)
+            self.recentNotifications = decoded
+        } catch {
+            print("Failed to decode recent notifications:", error)
+        }
+    }
+
+    private func saveRecentNotifications() {
+        do {
+            let data = try JSONEncoder().encode(recentNotifications)
+            UserDefaults.standard.set(data, forKey: "cfg_recentNotifications")
+        } catch {
+            print("Failed to encode recent notifications:", error)
+        }
     }
 
     private func scheduleAutoDismiss(seconds: TimeInterval) {

@@ -86,6 +86,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self,
+            selector: #selector(switchNotification),
+            name: Notification.Name("com.obelisk.switchNotification"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
             selector: #selector(toggleLyrics),
             name: Notification.Name("com.obelisk.toggleLyrics"),
             object: nil
@@ -262,6 +269,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func switchFile() {
         Task { @MainActor in
             WindowManager.shared.switchToTab(.file)
+        }
+    }
+
+    @objc private func switchNotification() {
+        Task { @MainActor in
+            let wm = WindowManager.shared
+            if !wm.isExpanded {
+                wm.expand(openingTab: .notification)
+            } else {
+                wm.switchToTab(.notification)
+            }
         }
     }
 

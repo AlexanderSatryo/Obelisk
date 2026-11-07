@@ -8,6 +8,7 @@ public enum ObeliskTab: Int, CaseIterable {
     case weather = 1
     case calendar = 2
     case file = 3
+    case notification = 4
 
     public var icon: String {
         switch self {
@@ -15,6 +16,7 @@ public enum ObeliskTab: Int, CaseIterable {
         case .weather: return "cloud.sun.fill"
         case .calendar: return "calendar"
         case .file: return "tray.and.arrow.down.fill"
+        case .notification: return "bell.fill"
         }
     }
 
@@ -24,6 +26,7 @@ public enum ObeliskTab: Int, CaseIterable {
         case .weather: return "Weather"
         case .calendar: return "Calendar"
         case .file: return "File"
+        case .notification: return "Notifications"
         }
     }
 }
@@ -76,6 +79,8 @@ public final class WindowManager: ObservableObject {
             if settings.enabledTabs.contains(.calendar) { self.currentTab = .calendar }
         case .alwaysFile:
             if settings.enabledTabs.contains(.file) { self.currentTab = .file }
+        case .alwaysNotification:
+            if settings.enabledTabs.contains(.notification) { self.currentTab = .notification }
         }
         NotificationCenter.default.addObserver(
             self,
@@ -596,6 +601,8 @@ public final class WindowManager: ObservableObject {
             candidate = .calendar
         case .alwaysFile:
             candidate = .file
+        case .alwaysNotification:
+            candidate = .notification
         }
         if let tab = candidate, enabled.contains(tab) {
             self.currentTab = tab

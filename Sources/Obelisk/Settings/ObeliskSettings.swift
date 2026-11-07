@@ -287,6 +287,7 @@ public enum DefaultOpeningTab: String, CaseIterable, Identifiable, Equatable {
     case alwaysWeather = "alwaysWeather"
     case alwaysCalendar = "alwaysCalendar"
     case alwaysFile = "alwaysFile"
+    case alwaysNotification = "alwaysNotification"
 
     public var id: String { rawValue }
 
@@ -297,6 +298,7 @@ public enum DefaultOpeningTab: String, CaseIterable, Identifiable, Equatable {
         case .alwaysWeather: return "Always Open Weather"
         case .alwaysCalendar: return "Always Open Calendar"
         case .alwaysFile: return "Always Open File Shelf"
+        case .alwaysNotification: return "Always Open Notifications"
         }
     }
 }
@@ -421,6 +423,7 @@ public struct ObeliskSettingsDraft: Equatable {
     public var enableWeatherTab: Bool = true
     public var enableCalendarTab: Bool = true
     public var enableFileTab: Bool = true
+    public var enableNotificationTab: Bool = true
     public var showDownloadsOnStandby: Bool = true
     public var enableNotifications: Bool = true
     public var requireTouchIDForNotifications: Bool = true
@@ -459,6 +462,7 @@ public struct ObeliskSettingsDraft: Equatable {
         if enableWeatherTab { list.append(.weather) }
         if enableCalendarTab { list.append(.calendar) }
         if enableFileTab { list.append(.file) }
+        if enableNotificationTab { list.append(.notification) }
         if list.isEmpty { list.append(.media) }
         return list
     }
@@ -522,6 +526,7 @@ public struct ObeliskSettingsDraft: Equatable {
             self.enableWeatherTab = def.enableWeatherTab
             self.enableCalendarTab = def.enableCalendarTab
             self.enableFileTab = def.enableFileTab
+            self.enableNotificationTab = def.enableNotificationTab
             self.defaultOpeningTab = def.defaultOpeningTab
             self.fileTrayCapacity = def.fileTrayCapacity
             self.autoClearAfterAirDrop = def.autoClearAfterAirDrop
@@ -730,6 +735,12 @@ public final class ObeliskSettings: ObservableObject {
             WindowManager.shared.ensureValidCurrentTab()
         }
     }
+    @Published public var enableNotificationTab: Bool {
+        didSet {
+            defaults.set(enableNotificationTab, forKey: "cfg_enableNotificationTab")
+            WindowManager.shared.ensureValidCurrentTab()
+        }
+    }
     @Published public var showDownloadsOnStandby: Bool {
         didSet { defaults.set(showDownloadsOnStandby, forKey: "cfg_showDownloadsOnStandby") }
     }
@@ -877,6 +888,7 @@ public final class ObeliskSettings: ObservableObject {
         self.enableWeatherTab = defaults.object(forKey: "cfg_enableWeatherTab") as? Bool ?? true
         self.enableCalendarTab = defaults.object(forKey: "cfg_enableCalendarTab") as? Bool ?? true
         self.enableFileTab = defaults.object(forKey: "cfg_enableFileTab") as? Bool ?? (defaults.object(forKey: "cfg_enableSystemTab") as? Bool ?? true)
+        self.enableNotificationTab = defaults.object(forKey: "cfg_enableNotificationTab") as? Bool ?? true
         self.showDownloadsOnStandby = defaults.object(forKey: "cfg_showDownloadsOnStandby") as? Bool ?? true
         self.enableNotifications = defaults.object(forKey: "cfg_enableNotifications") as? Bool ?? true
         self.requireTouchIDForNotifications = defaults.object(forKey: "cfg_requireTouchIDForNotifications") as? Bool ?? true
@@ -953,6 +965,7 @@ public final class ObeliskSettings: ObservableObject {
         d.enableWeatherTab = enableWeatherTab
         d.enableCalendarTab = enableCalendarTab
         d.enableFileTab = enableFileTab
+        d.enableNotificationTab = enableNotificationTab
         d.showDownloadsOnStandby = showDownloadsOnStandby
         d.enableNotifications = enableNotifications
         d.requireTouchIDForNotifications = requireTouchIDForNotifications
@@ -1022,6 +1035,7 @@ public final class ObeliskSettings: ObservableObject {
         enableWeatherTab = draft.enableWeatherTab
         enableCalendarTab = draft.enableCalendarTab
         enableFileTab = draft.enableFileTab
+        enableNotificationTab = draft.enableNotificationTab
         showDownloadsOnStandby = draft.showDownloadsOnStandby
         enableNotifications = draft.enableNotifications
         requireTouchIDForNotifications = draft.requireTouchIDForNotifications
@@ -1063,6 +1077,7 @@ public final class ObeliskSettings: ObservableObject {
         if enableWeatherTab { list.append(.weather) }
         if enableCalendarTab { list.append(.calendar) }
         if enableFileTab { list.append(.file) }
+        if enableNotificationTab { list.append(.notification) }
         if list.isEmpty { list.append(.media) }
         return list
     }
