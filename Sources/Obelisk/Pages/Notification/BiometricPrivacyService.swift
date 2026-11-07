@@ -13,6 +13,7 @@ public final class BiometricPrivacyService: ObservableObject {
     @Published public var biometryType: LABiometryType = .none
     @Published public var lastErrorMessage: String? = nil
     @Published public var lastAuthenticationFinishTime: Date = .distantPast
+    private var activeContext: LAContext? = nil
 
     private init() {
         checkBiometrics()
@@ -50,6 +51,7 @@ public final class BiometricPrivacyService: ObservableObject {
 
         let context = LAContext()
         context.localizedCancelTitle = "Cancel"
+        self.activeContext = context
 
         var error: NSError?
         let policy: LAPolicy = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
@@ -62,6 +64,9 @@ public final class BiometricPrivacyService: ObservableObject {
         context.evaluatePolicy(policy, localizedReason: reason) { [weak self] success, authError in
             Task { @MainActor in
                 guard let self = self else { return }
+                if self.activeContext === context {
+                    self.activeContext = nil
+                }
                 self.isAuthenticating = false
                 self.lastAuthenticationFinishTime = Date()
                 if success {
@@ -83,6 +88,8 @@ public final class BiometricPrivacyService: ObservableObject {
 
     /// Locks notification privacy and clears authentication state.
     public func lock() {
+        activeContext?.invalidate()
+        activeContext = nil
         withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
             self.isUnlocked = false
             self.isAuthenticating = false

@@ -521,13 +521,6 @@ public final class WindowManager: ObservableObject {
             return
         }
 
-        // Keep expanded while Apple Touch ID system prompt is active or right after unlocking
-        if BiometricPrivacyService.shared.isAuthenticating ||
-           Date().timeIntervalSince(BiometricPrivacyService.shared.lastAuthenticationFinishTime) < 3.5 {
-            outsideTickCount = 0
-            return
-        }
-
         let expandedZone = ScreenGeometry.expandedHoverFrame(for: expandedSize)
 
         if expandedZone.contains(mouseLoc) {

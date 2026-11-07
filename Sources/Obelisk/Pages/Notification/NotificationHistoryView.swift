@@ -203,11 +203,10 @@ public struct NotificationHistoryView: View {
                     notificationService.openNotificationApp(item)
                 }) {
                     Image(systemName: "arrow.up.forward.app.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(isHovered ? .white : .white.opacity(0.6))
-                        .frame(width: 20, height: 20)
-                        .background(Color.white.opacity(isHovered ? 0.15 : 0.08))
-                        .clipShape(Circle())
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundColor(isHovered ? .white : .white.opacity(0.55))
+                        .frame(width: 18, height: 18)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .pointingHandCursor()
