@@ -9,7 +9,6 @@ public final class NotificationService: ObservableObject {
     public static let shared = NotificationService()
 
     @Published public var activeNotification: ObeliskNotification? = nil
-    @Published public var isCardExpanded: Bool = false
     @Published public var recentNotifications: [ObeliskNotification] = []
 
     private var autoDismissWorkItem: DispatchWorkItem?
@@ -55,7 +54,6 @@ public final class NotificationService: ObservableObject {
 
         // Lock biometrics for incoming private notifications
         BiometricPrivacyService.shared.lock()
-        self.isCardExpanded = false
 
         // Archive into recent notifications history
         recentNotifications.removeAll { $0.id == notification.id }
@@ -83,7 +81,6 @@ public final class NotificationService: ObservableObject {
         autoDismissWorkItem = nil
 
         withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
-            self.isCardExpanded = false
             self.activeNotification = nil
             BiometricPrivacyService.shared.lock()
             if !WindowManager.shared.isExpanded {
@@ -92,36 +89,9 @@ public final class NotificationService: ObservableObject {
         }
     }
 
-    /// Handles user clicks on the notification notch pill.
+    /// Handles user clicks on the notification notch pill: dismisses the standby alert cleanly.
     public func handleNotchTap() {
-        guard let notification = activeNotification else { return }
-
-        // Cancel previous timer when user actively interacts
-        autoDismissWorkItem?.cancel()
-        autoDismissWorkItem = nil
-
-        let requireBiometrics = ObeliskSettings.shared.requireTouchIDForNotifications
-        if !requireBiometrics || BiometricPrivacyService.shared.isUnlocked {
-            // Already authenticated or biometrics not required: toggle card expansion
-            withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
-                self.isCardExpanded.toggle()
-                WindowManager.shared.updateCompactWidth(animated: false)
-            }
-            if isCardExpanded {
-                scheduleAutoDismiss(seconds: 25.0)
-            }
-        } else {
-            // Prompt native Apple Touch ID
-            let reason = "Touch ID to view notification from \(notification.appName)"
-            BiometricPrivacyService.shared.authenticate(reason: reason) { [weak self] success in
-                guard let self = self, success else { return }
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.80)) {
-                    self.isCardExpanded = true
-                    WindowManager.shared.updateCompactWidth(animated: false)
-                }
-                self.scheduleAutoDismiss(seconds: 25.0)
-            }
-        }
+        dismissNotification()
     }
 
     /// Opens the application associated with the active notification and dismisses the notch card.
@@ -189,49 +159,5 @@ public final class NotificationService: ObservableObject {
         }
         autoDismissWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
-    }
-
-    // MARK: - Testing & Simulation Helpers
-
-    public enum SampleNotificationType {
-        case whatsapp
-        case mail
-        case telegram
-        case messages
-    }
-
-    public func simulateSample(type: SampleNotificationType) {
-        let notif: ObeliskNotification
-        switch type {
-        case .whatsapp:
-            notif = ObeliskNotification(
-                appName: "WhatsApp",
-                bundleIdentifier: "net.whatsapp.WhatsApp",
-                sender: "Sarah Jenkins",
-                message: "Hey! Are you still working on the Obelisk update? Let's catch up later."
-            )
-        case .mail:
-            notif = ObeliskNotification(
-                appName: "Mail",
-                bundleIdentifier: "com.apple.mail",
-                sender: "Alexander Satryo",
-                message: "Build completed successfully on Feature/Notification with Touch ID biometrics."
-            )
-        case .telegram:
-            notif = ObeliskNotification(
-                appName: "Telegram",
-                bundleIdentifier: "ru.keepcoder.Telegram",
-                sender: "Design Core",
-                message: "New Apple Dynamic Island notification spec is ready for review."
-            )
-        case .messages:
-            notif = ObeliskNotification(
-                appName: "Messages",
-                bundleIdentifier: "com.apple.MobileSMS",
-                sender: "Mom",
-                message: "Dinner is ready! Don't forget to take a break."
-            )
-        }
-        postNotification(notif)
     }
 }

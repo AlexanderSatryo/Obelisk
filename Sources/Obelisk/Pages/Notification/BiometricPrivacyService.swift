@@ -42,8 +42,8 @@ public final class BiometricPrivacyService: ObservableObject {
         reason: String = "Touch ID to view private notification",
         completion: ((Bool) -> Void)? = nil
     ) {
-        guard !isUnlocked else {
-            completion?(true)
+        guard !isUnlocked, !isAuthenticating else {
+            completion?(isUnlocked)
             return
         }
 

@@ -1051,32 +1051,6 @@ public struct SettingsView: View {
                             value: $draft.notificationAutoDismissSeconds,
                             range: 5...30
                         )
-
-                        PreferenceRow(
-                            title: "Preview & Simulation",
-                            subtitle: "Trigger instant test notifications to verify Dynamic Island and Touch ID",
-                            isHighlighted: matchesCurrentQuery("notifications")
-                        ) {
-                            HStack(spacing: 8) {
-                                Button("WhatsApp") {
-                                    NotificationService.shared.simulateSample(type: .whatsapp)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-
-                                Button("Mail") {
-                                    NotificationService.shared.simulateSample(type: .mail)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-
-                                Button("Telegram") {
-                                    NotificationService.shared.simulateSample(type: .telegram)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-                        }
                     }
                 }
             }

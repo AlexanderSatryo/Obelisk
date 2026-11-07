@@ -19,6 +19,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = CameraMirrorService.shared
         _ = BiometricPrivacyService.shared
         _ = NotificationService.shared
+        RealNotificationMonitor.shared.startMonitoring()
         SystemVolumeAndBrightnessMonitor.shared.startMonitoring()
 
         NotificationCenter.default.addObserver(
@@ -135,22 +136,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self,
-            selector: #selector(testWhatsAppNotification),
-            name: Notification.Name("com.obelisk.testWhatsApp"),
-            object: nil
-        )
-
-        DistributedNotificationCenter.default().addObserver(
-            self,
-            selector: #selector(testMailNotification),
-            name: Notification.Name("com.obelisk.testMail"),
-            object: nil
-        )
-
-        DistributedNotificationCenter.default().addObserver(
-            self,
-            selector: #selector(testTelegramNotification),
-            name: Notification.Name("com.obelisk.testTelegram"),
+            selector: #selector(dismissNotificationHUD),
+            name: Notification.Name("com.obelisk.dismissNotification"),
             object: nil
         )
 
@@ -163,8 +150,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self,
-            selector: #selector(dismissNotificationHUD),
-            name: Notification.Name("com.obelisk.dismissNotification"),
+            selector: #selector(clearRecentNotifications),
+            name: Notification.Name("com.obelisk.clearNotifications"),
             object: nil
         )
 
@@ -344,35 +331,21 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc private func testWhatsAppNotification() {
+    @objc private func dismissNotificationHUD() {
         Task { @MainActor in
-            NotificationService.shared.simulateSample(type: .whatsapp)
-        }
-    }
-
-    @objc private func testMailNotification() {
-        Task { @MainActor in
-            NotificationService.shared.simulateSample(type: .mail)
-        }
-    }
-
-    @objc private func testTelegramNotification() {
-        Task { @MainActor in
-            NotificationService.shared.simulateSample(type: .telegram)
+            NotificationService.shared.dismissNotification()
         }
     }
 
     @objc private func testUnlockNotification() {
         Task { @MainActor in
             BiometricPrivacyService.shared.isUnlocked = true
-            NotificationService.shared.isCardExpanded = true
-            WindowManager.shared.updateCompactWidth()
         }
     }
 
-    @objc private func dismissNotificationHUD() {
+    @objc private func clearRecentNotifications() {
         Task { @MainActor in
-            NotificationService.shared.dismissNotification()
+            NotificationService.shared.clearAllRecentNotifications()
         }
     }
 

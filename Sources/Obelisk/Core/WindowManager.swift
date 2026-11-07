@@ -145,15 +145,10 @@ public final class WindowManager: ObservableObject {
         let targetHeight: CGFloat
         let customBaseHeight = max(24, baseHeight + CGFloat(settings.compactHeightOffset))
         if let _ = NotificationService.shared.activeNotification {
-            if NotificationService.shared.isCardExpanded {
-                targetWidth = max(420, baseWidth + 240)
-                targetHeight = customBaseHeight + NotificationNotchView.cardBodyHeight
-            } else {
-                let notifExtra: CGFloat = 280
-                let extraWidth: CGFloat = max(CGFloat(settings.compactWidthOffset), notifExtra)
-                targetWidth = baseWidth + extraWidth
-                targetHeight = customBaseHeight
-            }
+            let notifExtra: CGFloat = 280
+            let extraWidth: CGFloat = max(CGFloat(settings.compactWidthOffset), notifExtra)
+            targetWidth = baseWidth + extraWidth
+            targetHeight = customBaseHeight
         } else if let hud = HardwareTelemetryService.shared.activeTransientHUD {
             let isBatteryHUD: Bool
             let isVolOrBright: Bool
@@ -292,6 +287,7 @@ public final class WindowManager: ObservableObject {
         lastCollapseTime = Date()
         outsideTickCount = 0
         CalendarService.shared.isCalendarExpanded = false
+        BiometricPrivacyService.shared.lock()
         NSCursor.arrow.set()
 
         // If Mission Control is active, immediately collapse without animation delay to keep notch completely static

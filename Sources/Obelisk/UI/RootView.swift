@@ -35,9 +35,6 @@ public struct RootView: View {
 
     private var currentRadius: CGFloat {
         if showsExpanded { return CGFloat(settings.expandedCornerRadius) }
-        if notificationService.activeNotification != nil {
-            return notificationService.isCardExpanded ? 28.0 : CGFloat(settings.compactCornerRadius)
-        }
         if isNativeBlackStandbyHUD {
             if settings.standbyHUDStyle == .horizontalWings {
                 return CGFloat(settings.compactCornerRadius)
@@ -51,9 +48,6 @@ public struct RootView: View {
     private var currentTopEarRadius: CGFloat {
         if showsExpanded {
             return CGFloat(settings.expandedTopCornerRadius)
-        }
-        if notificationService.activeNotification != nil && notificationService.isCardExpanded {
-            return min(12.0, CGFloat(settings.compactTopCornerRadius) + 1)
         }
         if isNativeBlackStandbyHUD && settings.standbyHUDStyle == .downwardCard {
             return min(12.0, CGFloat(settings.compactTopCornerRadius) + 1)
@@ -152,9 +146,7 @@ public struct RootView: View {
                 guard !ScreenGeometry.isMissionControlActive() else { return }
                 if !windowManager.isExpanded {
                     if notificationService.activeNotification != nil {
-                        if !notificationService.isCardExpanded {
-                            notificationService.handleNotchTap()
-                        }
+                        notificationService.dismissNotification()
                     } else if settings.triggerMode != .hoverOnly {
                         windowManager.expand()
                     }

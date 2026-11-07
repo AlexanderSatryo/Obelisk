@@ -27,105 +27,77 @@ public struct NotificationHistoryView: View {
         }
         .frame(height: 114)
         .padding(.top, 2)
+        .onAppear {
+            autoAuthenticateWithTouchID()
+        }
+        .onDisappear {
+            biometrics.lock()
+        }
+    }
+
+    private func autoAuthenticateWithTouchID() {
+        guard settings.requireTouchIDForNotifications, !biometrics.isUnlocked else { return }
+        // Automatically request Touch ID immediately upon opening the page
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            self.biometrics.authenticate(reason: "Touch ID to view recent notifications")
+        }
     }
 
     // MARK: - Locked Privacy State
 
     private var lockedPrivacyView: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 7) {
             ZStack {
                 Circle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 34, height: 34)
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.85))
+                    .fill(Color(red: 52/255, green: 199/255, blue: 89/255).opacity(0.12))
+                    .frame(width: 38, height: 38)
+                Image(systemName: "touchid")
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundColor(Color(red: 52/255, green: 199/255, blue: 89/255))
             }
 
             VStack(spacing: 2) {
-                Text("Notifications Protected")
-                    .font(.system(size: 12, weight: .semibold))
+                Text("Touch ID Required")
+                    .font(.system(size: 12.5, weight: .semibold))
                     .foregroundColor(.white)
 
-                Text("Touch ID is required to reveal message contents and senders.")
+                Text("Touch the sensor on your Mac keyboard to unlock notifications.")
                     .font(.system(size: 10.5, weight: .regular))
                     .foregroundColor(.white.opacity(0.55))
             }
 
-            Button(action: {
-                biometrics.authenticate(reason: "Touch ID to view recent notifications")
-            }) {
-                HStack(spacing: 5) {
-                    Image(systemName: "touchid")
-                        .font(.system(size: 11, weight: .bold))
-                    Text("Unlock with Touch ID")
-                        .font(.system(size: 11, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4.5)
-                .background(Color.white.opacity(0.12))
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
-                )
+            if let error = biometrics.lastErrorMessage {
+                Text(error)
+                    .font(.system(size: 9.5, weight: .medium))
+                    .foregroundColor(Color(red: 255/255, green: 69/255, blue: 58/255))
+                    .padding(.top, 2)
             }
-            .buttonStyle(.plain)
-            .pointingHandCursor()
-            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .pointingHandCursor()
+        .onTapGesture {
+            autoAuthenticateWithTouchID()
+        }
     }
 
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 7) {
             Image(systemName: "bell.slash")
-                .font(.system(size: 22, weight: .light))
-                .foregroundColor(.white.opacity(0.40))
+                .font(.system(size: 24, weight: .light))
+                .foregroundColor(.white.opacity(0.35))
 
             VStack(spacing: 2) {
                 Text("No Recent Notifications")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.85))
 
-                Text("Incoming alerts from WhatsApp, Mail, and other apps will appear here.")
+                Text("Notifications from WhatsApp, Mail, and other applications will appear here.")
                     .font(.system(size: 10.5, weight: .regular))
                     .foregroundColor(.white.opacity(0.5))
             }
-
-            HStack(spacing: 8) {
-                Button(action: {
-                    notificationService.simulateSample(type: .whatsapp)
-                }) {
-                    Text("+ WhatsApp Alert")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.75))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .pointingHandCursor()
-
-                Button(action: {
-                    notificationService.simulateSample(type: .mail)
-                }) {
-                    Text("+ Mail Alert")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.white.opacity(0.75))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .pointingHandCursor()
-            }
-            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -246,9 +218,11 @@ public struct NotificationHistoryView: View {
                 }
 
                 HStack(spacing: 4) {
-                    Text(item.sender + ":")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.white)
+                    if !item.sender.isEmpty {
+                        Text(item.sender + ":")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                    }
 
                     Text(item.message)
                         .font(.system(size: 11, weight: .regular))
