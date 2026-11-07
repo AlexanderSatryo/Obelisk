@@ -6,6 +6,7 @@ public struct NotificationHistoryView: View {
     @ObservedObject var notificationService: NotificationService = .shared
     @ObservedObject var biometrics: BiometricPrivacyService = .shared
     @ObservedObject var settings: ObeliskSettings = .shared
+    @ObservedObject var windowManager: WindowManager = .shared
 
     @State private var hoveredNotificationId: UUID? = nil
 
@@ -30,12 +31,23 @@ public struct NotificationHistoryView: View {
         .onAppear {
             autoAuthenticateWithTouchID()
         }
+        .onChange(of: windowManager.isExpanded) { isExpanded in
+            if isExpanded && windowManager.currentTab == .notification {
+                autoAuthenticateWithTouchID()
+            }
+        }
+        .onChange(of: windowManager.currentTab) { tab in
+            if tab == .notification && windowManager.isExpanded {
+                autoAuthenticateWithTouchID()
+            }
+        }
     }
 
     private func autoAuthenticateWithTouchID() {
         guard settings.requireTouchIDForNotifications, !biometrics.isUnlocked else { return }
         // Automatically request Touch ID immediately upon opening the page
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            guard self.windowManager.isExpanded, self.windowManager.currentTab == .notification else { return }
             self.biometrics.authenticate(reason: "Touch ID to view recent notifications")
         }
     }
