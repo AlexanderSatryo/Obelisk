@@ -26,30 +26,49 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         appIcon: NSImage? = nil,
         appURL: URL? = nil
     ) {
+        let cleanAppName = ObeliskNotification.stripBidiControlMarks(appName)
+        let cleanSender = ObeliskNotification.stripBidiControlMarks(sender)
+        let cleanMessage = ObeliskNotification.stripBidiControlMarks(message)
+
         self.id = id
-        self.appName = appName
+        self.appName = cleanAppName
         self.bundleIdentifier = bundleIdentifier
-        self.sender = sender
-        self.message = message
+        self.sender = cleanSender
+        self.message = cleanMessage
         self.timestamp = timestamp
 
-        let resolvedURL = appURL ?? ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: appName)
+        let resolvedURL = appURL ?? ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: cleanAppName)
         self.appURL = resolvedURL
-        self.appIcon = appIcon ?? ObeliskNotification.resolveIcon(url: resolvedURL, bundleIdentifier: bundleIdentifier, appName: appName)
+        self.appIcon = appIcon ?? ObeliskNotification.resolveIcon(url: resolvedURL, bundleIdentifier: bundleIdentifier, appName: cleanAppName)
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(UUID.self, forKey: .id)
-        self.appName = try container.decode(String.self, forKey: .appName)
+        let rawAppName = try container.decode(String.self, forKey: .appName)
         self.bundleIdentifier = try container.decode(String.self, forKey: .bundleIdentifier)
-        self.sender = try container.decode(String.self, forKey: .sender)
-        self.message = try container.decode(String.self, forKey: .message)
+        let rawSender = try container.decode(String.self, forKey: .sender)
+        let rawMessage = try container.decode(String.self, forKey: .message)
         self.timestamp = try container.decode(Date.self, forKey: .timestamp)
 
-        let resolvedURL = ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: appName)
+        let cleanAppName = ObeliskNotification.stripBidiControlMarks(rawAppName)
+        self.appName = cleanAppName
+        self.sender = ObeliskNotification.stripBidiControlMarks(rawSender)
+        self.message = ObeliskNotification.stripBidiControlMarks(rawMessage)
+
+        let resolvedURL = ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: cleanAppName)
         self.appURL = resolvedURL
-        self.appIcon = ObeliskNotification.resolveIcon(url: resolvedURL, bundleIdentifier: bundleIdentifier, appName: appName)
+        self.appIcon = ObeliskNotification.resolveIcon(url: resolvedURL, bundleIdentifier: bundleIdentifier, appName: cleanAppName)
+    }
+
+    /// Removes invisible Unicode directional marks (e.g. U+200E Left-to-Right Mark used by WhatsApp Catalyst).
+    public static func stripBidiControlMarks(_ text: String) -> String {
+        let bidiMarks: Set<Unicode.Scalar> = [
+            "\u{200E}", "\u{200F}", "\u{202A}", "\u{202B}", "\u{202C}",
+            "\u{202D}", "\u{202E}", "\u{2066}", "\u{2067}", "\u{2068}", "\u{2069}"
+        ]
+        let filtered = String(text.unicodeScalars.filter { !bidiMarks.contains($0) })
+        return filtered.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     public func encode(to encoder: Encoder) throws {

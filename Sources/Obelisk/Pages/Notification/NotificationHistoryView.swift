@@ -30,9 +30,6 @@ public struct NotificationHistoryView: View {
         .onAppear {
             autoAuthenticateWithTouchID()
         }
-        .onDisappear {
-            biometrics.lock()
-        }
     }
 
     private func autoAuthenticateWithTouchID() {
@@ -106,42 +103,13 @@ public struct NotificationHistoryView: View {
 
     private var recentFeedView: some View {
         VStack(spacing: 5) {
-            // Header Bar with Count & Quick Actions
+            // Header Bar with Quick Actions
             HStack(spacing: 6) {
                 Text("Recent")
                     .font(.system(size: 11.5, weight: .semibold))
                     .foregroundColor(.white.opacity(0.9))
 
-                Text("\(notificationService.recentNotifications.count)")
-                    .font(.system(size: 9.5, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1.5)
-                    .background(Color.white.opacity(0.12))
-                    .clipShape(Capsule())
-
                 Spacer()
-
-                if settings.requireTouchIDForNotifications {
-                    Button(action: {
-                        biometrics.lock()
-                    }) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 8.5, weight: .semibold))
-                            Text("Lock")
-                                .font(.system(size: 9.5, weight: .medium))
-                        }
-                        .foregroundColor(.white.opacity(0.6))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.white.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .pointingHandCursor()
-                }
 
                 Button(action: {
                     notificationService.clearAllRecentNotifications()
@@ -153,10 +121,6 @@ public struct NotificationHistoryView: View {
                             .font(.system(size: 9.5, weight: .medium))
                     }
                     .foregroundColor(.white.opacity(0.5))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .pointingHandCursor()

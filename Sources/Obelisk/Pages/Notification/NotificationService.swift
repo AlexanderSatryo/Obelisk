@@ -52,8 +52,10 @@ public final class NotificationService: ObservableObject {
         autoDismissWorkItem?.cancel()
         autoDismissWorkItem = nil
 
-        // Lock biometrics for incoming private notifications
-        BiometricPrivacyService.shared.lock()
+        // Lock biometrics for incoming private notifications only when the notch is collapsed
+        if !WindowManager.shared.isExpanded {
+            BiometricPrivacyService.shared.lock()
+        }
 
         // Archive into recent notifications history
         recentNotifications.removeAll { $0.id == notification.id }
@@ -104,8 +106,8 @@ public final class NotificationService: ObservableObject {
 
         withAnimation(.spring(response: 0.32, dampingFraction: 0.85)) {
             self.activeNotification = nil
-            BiometricPrivacyService.shared.lock()
             if !WindowManager.shared.isExpanded {
+                BiometricPrivacyService.shared.lock()
                 WindowManager.shared.updateCompactWidth(animated: false)
             }
         }
