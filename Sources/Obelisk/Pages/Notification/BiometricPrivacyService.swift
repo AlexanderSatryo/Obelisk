@@ -12,6 +12,7 @@ public final class BiometricPrivacyService: ObservableObject {
     @Published public var canUseBiometrics: Bool = false
     @Published public var biometryType: LABiometryType = .none
     @Published public var lastErrorMessage: String? = nil
+    @Published public var lastAuthenticationFinishTime: Date = .distantPast
 
     private init() {
         checkBiometrics()
@@ -62,6 +63,7 @@ public final class BiometricPrivacyService: ObservableObject {
             Task { @MainActor in
                 guard let self = self else { return }
                 self.isAuthenticating = false
+                self.lastAuthenticationFinishTime = Date()
                 if success {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
                         self.isUnlocked = true

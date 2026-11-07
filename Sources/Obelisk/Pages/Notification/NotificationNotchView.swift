@@ -31,16 +31,12 @@ public struct NotificationNotchView: View {
 
                 Spacer(minLength: notchWidth)
 
-                // Right Wing: [New Notifications! 🔒]
-                HStack(spacing: 5) {
+                // Right Wing: [New Notifications!]
+                HStack(spacing: 0) {
                     Text("New Notifications!")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
-
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white.opacity(0.85))
                 }
                 .offset(x: -5.5)
                 .frame(width: wingWidth, alignment: .center)

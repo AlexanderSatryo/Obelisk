@@ -9,6 +9,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        configureApplicationIcon()
 
         _ = ObeliskSettings.shared
         _ = MediaManager.shared
@@ -157,6 +158,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         updateStatusItemVisibility()
         WindowManager.shared.setupWindow()
+    }
+
+    private func configureApplicationIcon() {
+        if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let iconImage = NSImage(contentsOf: iconURL) {
+            NSApp.applicationIconImage = iconImage
+        }
     }
 
     @objc private func handleMenuBarVisibilityChange() {

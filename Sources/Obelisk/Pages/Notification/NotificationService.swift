@@ -75,6 +75,28 @@ public final class NotificationService: ObservableObject {
         scheduleAutoDismiss(seconds: timeout)
     }
 
+    /// Updates the sender and message of an existing notification when rich banner text arrives shortly after push delivery.
+    public func enrichNotification(id: UUID, appName: String? = nil, bundleIdentifier: String? = nil, sender: String, message: String) {
+        if let idx = recentNotifications.firstIndex(where: { $0.id == id }) {
+            let old = recentNotifications[idx]
+            let updated = ObeliskNotification(
+                id: old.id,
+                appName: appName ?? old.appName,
+                bundleIdentifier: bundleIdentifier ?? old.bundleIdentifier,
+                sender: sender,
+                message: message,
+                timestamp: old.timestamp,
+                appIcon: old.appIcon,
+                appURL: old.appURL
+            )
+            recentNotifications[idx] = updated
+            if activeNotification?.id == id {
+                activeNotification = updated
+            }
+            saveRecentNotifications()
+        }
+    }
+
     /// Dismisses the active notification and returns the notch to its normal collapsed state.
     public func dismissNotification() {
         autoDismissWorkItem?.cancel()
