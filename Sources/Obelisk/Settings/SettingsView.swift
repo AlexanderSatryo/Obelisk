@@ -126,6 +126,7 @@ public enum SettingsSearchIndex {
         SettingsSearchItem(id: "autoClearAfterAirDrop", title: "Auto-Clear After AirDrop", category: .modules, keywords: ["auto-clear", "clear after airdrop", "automatic clear", "empty shelf"]),
         SettingsSearchItem(id: "calendarEventDots", title: "Calendar Event Indicators", category: .modules, keywords: ["calendar event", "event dots", "event indicators", "agenda markers", "event badge"]),
         SettingsSearchItem(id: "downloads", title: "Live Downloads & Task Progress", category: .modules, keywords: ["download", "downloads", "progress", "live activities", "download progress", "crdownload", "task progress"]),
+        SettingsSearchItem(id: "notifications", title: "Dynamic Island Notifications & Touch ID", category: .modules, keywords: ["notification", "notifications", "touch id", "face id", "biometrics", "privacy", "whatsapp", "mail", "telegram", "messages", "dynamic island notifications", "lock"]),
 
         // Media & Lyrics
         SettingsSearchItem(id: "lyrics", title: "Synchronized Lyrics", category: .media, keywords: ["synchronized lyrics", "lyrics", "live lyrics", "synced lyrics", "auto-expand lyrics"]),
@@ -1014,6 +1015,62 @@ public struct SettingsView: View {
                         isHighlighted: matchesCurrentQuery("downloads"),
                         isOn: $draft.showDownloadsOnStandby
                     )
+                }
+            }
+
+            if isSectionVisible(["notifications"]) {
+                PreferenceSection(
+                    title: "DYNAMIC ISLAND NOTIFICATIONS",
+                    isHighlighted: matchesCurrentQuery("notifications")
+                ) {
+                    PreferenceToggleRow(
+                        title: "Notifications HUD",
+                        subtitle: "Displays incoming alerts and messages in the Dynamic Island wings",
+                        isHighlighted: matchesCurrentQuery("notifications"),
+                        isOn: $draft.enableNotifications
+                    )
+
+                    if draft.enableNotifications {
+                        PreferenceToggleRow(
+                            title: "Require Touch ID for Details",
+                            subtitle: "Hides sender and message content behind biometrics verification",
+                            isHighlighted: matchesCurrentQuery("notifications"),
+                            isOn: $draft.requireTouchIDForNotifications
+                        )
+
+                        PreferenceSliderRow(
+                            title: "Auto-Dismiss Timeout",
+                            isHighlighted: matchesCurrentQuery("notifications"),
+                            value: $draft.notificationAutoDismissSeconds,
+                            range: 5...30
+                        )
+
+                        PreferenceRow(
+                            title: "Preview & Simulation",
+                            subtitle: "Trigger instant test notifications to verify Dynamic Island and Touch ID",
+                            isHighlighted: matchesCurrentQuery("notifications")
+                        ) {
+                            HStack(spacing: 8) {
+                                Button("WhatsApp") {
+                                    NotificationService.shared.simulateSample(type: .whatsapp)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+
+                                Button("Mail") {
+                                    NotificationService.shared.simulateSample(type: .mail)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+
+                                Button("Telegram") {
+                                    NotificationService.shared.simulateSample(type: .telegram)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                        }
+                    }
                 }
             }
 

@@ -17,6 +17,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = HardwareTelemetryService.shared
         _ = AudioPeripheralsService.shared
         _ = CameraMirrorService.shared
+        _ = BiometricPrivacyService.shared
+        _ = NotificationService.shared
         SystemVolumeAndBrightnessMonitor.shared.startMonitoring()
 
         NotificationCenter.default.addObserver(
@@ -121,6 +123,41 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             self,
             selector: #selector(testBatteryUnpluggedHUD),
             name: Notification.Name("com.obelisk.testBatteryUnpluggedHUD"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testWhatsAppNotification),
+            name: Notification.Name("com.obelisk.testWhatsApp"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testMailNotification),
+            name: Notification.Name("com.obelisk.testMail"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testTelegramNotification),
+            name: Notification.Name("com.obelisk.testTelegram"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testUnlockNotification),
+            name: Notification.Name("com.obelisk.testUnlockNotification"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(dismissNotificationHUD),
+            name: Notification.Name("com.obelisk.dismissNotification"),
             object: nil
         )
 
@@ -286,6 +323,38 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 ),
                 duration: 4.0
             )
+        }
+    }
+
+    @objc private func testWhatsAppNotification() {
+        Task { @MainActor in
+            NotificationService.shared.simulateSample(type: .whatsapp)
+        }
+    }
+
+    @objc private func testMailNotification() {
+        Task { @MainActor in
+            NotificationService.shared.simulateSample(type: .mail)
+        }
+    }
+
+    @objc private func testTelegramNotification() {
+        Task { @MainActor in
+            NotificationService.shared.simulateSample(type: .telegram)
+        }
+    }
+
+    @objc private func testUnlockNotification() {
+        Task { @MainActor in
+            BiometricPrivacyService.shared.isUnlocked = true
+            NotificationService.shared.isCardExpanded = true
+            WindowManager.shared.updateCompactWidth()
+        }
+    }
+
+    @objc private func dismissNotificationHUD() {
+        Task { @MainActor in
+            NotificationService.shared.dismissNotification()
         }
     }
 

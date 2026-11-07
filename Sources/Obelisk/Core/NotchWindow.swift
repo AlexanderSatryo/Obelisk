@@ -299,6 +299,12 @@ public final class NotchHostingView<Content: View>: NSHostingView<Content> {
     public override func mouseDown(with event: NSEvent) {
         Task { @MainActor in
             guard !ScreenGeometry.isMissionControlActive() else { return }
+            if NotificationService.shared.activeNotification != nil {
+                if !NotificationService.shared.isCardExpanded {
+                    NotificationService.shared.handleNotchTap()
+                }
+                return
+            }
             if !WindowManager.shared.isExpanded && ObeliskSettings.shared.triggerMode != .hoverOnly {
                 WindowManager.shared.expand()
                 return

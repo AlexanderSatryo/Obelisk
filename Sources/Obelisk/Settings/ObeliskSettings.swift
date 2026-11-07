@@ -422,6 +422,9 @@ public struct ObeliskSettingsDraft: Equatable {
     public var enableCalendarTab: Bool = true
     public var enableFileTab: Bool = true
     public var showDownloadsOnStandby: Bool = true
+    public var enableNotifications: Bool = true
+    public var requireTouchIDForNotifications: Bool = true
+    public var notificationAutoDismissSeconds: Double = 10.0
     public var enableSystemTab: Bool {
         get { enableFileTab }
         set { enableFileTab = newValue }
@@ -523,6 +526,9 @@ public struct ObeliskSettingsDraft: Equatable {
             self.fileTrayCapacity = def.fileTrayCapacity
             self.autoClearAfterAirDrop = def.autoClearAfterAirDrop
             self.showCalendarEventDots = def.showCalendarEventDots
+            self.enableNotifications = def.enableNotifications
+            self.requireTouchIDForNotifications = def.requireTouchIDForNotifications
+            self.notificationAutoDismissSeconds = def.notificationAutoDismissSeconds
 
         case .media:
             self.skipIntervalSeconds = def.skipIntervalSeconds
@@ -727,6 +733,15 @@ public final class ObeliskSettings: ObservableObject {
     @Published public var showDownloadsOnStandby: Bool {
         didSet { defaults.set(showDownloadsOnStandby, forKey: "cfg_showDownloadsOnStandby") }
     }
+    @Published public var enableNotifications: Bool {
+        didSet { defaults.set(enableNotifications, forKey: "cfg_enableNotifications") }
+    }
+    @Published public var requireTouchIDForNotifications: Bool {
+        didSet { defaults.set(requireTouchIDForNotifications, forKey: "cfg_requireTouchIDForNotifications") }
+    }
+    @Published public var notificationAutoDismissSeconds: Double {
+        didSet { defaults.set(notificationAutoDismissSeconds, forKey: "cfg_notificationAutoDismissSeconds") }
+    }
     public var enableSystemTab: Bool {
         get { enableFileTab }
         set { enableFileTab = newValue }
@@ -863,6 +878,9 @@ public final class ObeliskSettings: ObservableObject {
         self.enableCalendarTab = defaults.object(forKey: "cfg_enableCalendarTab") as? Bool ?? true
         self.enableFileTab = defaults.object(forKey: "cfg_enableFileTab") as? Bool ?? (defaults.object(forKey: "cfg_enableSystemTab") as? Bool ?? true)
         self.showDownloadsOnStandby = defaults.object(forKey: "cfg_showDownloadsOnStandby") as? Bool ?? true
+        self.enableNotifications = defaults.object(forKey: "cfg_enableNotifications") as? Bool ?? true
+        self.requireTouchIDForNotifications = defaults.object(forKey: "cfg_requireTouchIDForNotifications") as? Bool ?? true
+        self.notificationAutoDismissSeconds = defaults.object(forKey: "cfg_notificationAutoDismissSeconds") as? Double ?? 10.0
         let savedDefaultTabRaw = defaults.string(forKey: "cfg_defaultOpeningTab") ?? ""
         if savedDefaultTabRaw == "alwaysSystem" {
             self.defaultOpeningTab = .alwaysFile
@@ -936,6 +954,9 @@ public final class ObeliskSettings: ObservableObject {
         d.enableCalendarTab = enableCalendarTab
         d.enableFileTab = enableFileTab
         d.showDownloadsOnStandby = showDownloadsOnStandby
+        d.enableNotifications = enableNotifications
+        d.requireTouchIDForNotifications = requireTouchIDForNotifications
+        d.notificationAutoDismissSeconds = notificationAutoDismissSeconds
         d.defaultOpeningTab = defaultOpeningTab
         d.fileTrayCapacity = fileTrayCapacity
         d.autoClearAfterAirDrop = autoClearAfterAirDrop
@@ -1002,6 +1023,9 @@ public final class ObeliskSettings: ObservableObject {
         enableCalendarTab = draft.enableCalendarTab
         enableFileTab = draft.enableFileTab
         showDownloadsOnStandby = draft.showDownloadsOnStandby
+        enableNotifications = draft.enableNotifications
+        requireTouchIDForNotifications = draft.requireTouchIDForNotifications
+        notificationAutoDismissSeconds = draft.notificationAutoDismissSeconds
         defaultOpeningTab = draft.defaultOpeningTab
         fileTrayCapacity = draft.fileTrayCapacity
         autoClearAfterAirDrop = draft.autoClearAfterAirDrop

@@ -139,7 +139,17 @@ public final class WindowManager: ObservableObject {
         let targetWidth: CGFloat
         let targetHeight: CGFloat
         let customBaseHeight = max(24, baseHeight + CGFloat(settings.compactHeightOffset))
-        if let hud = HardwareTelemetryService.shared.activeTransientHUD {
+        if let _ = NotificationService.shared.activeNotification {
+            if NotificationService.shared.isCardExpanded {
+                targetWidth = max(420, baseWidth + 240)
+                targetHeight = customBaseHeight + NotificationNotchView.cardBodyHeight
+            } else {
+                let notifExtra: CGFloat = 280
+                let extraWidth: CGFloat = max(CGFloat(settings.compactWidthOffset), notifExtra)
+                targetWidth = baseWidth + extraWidth
+                targetHeight = customBaseHeight
+            }
+        } else if let hud = HardwareTelemetryService.shared.activeTransientHUD {
             let isBatteryHUD: Bool
             let isVolOrBright: Bool
             switch hud {

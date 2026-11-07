@@ -7,6 +7,7 @@ public struct RootView: View {
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var settings: ObeliskSettings = .shared
     @ObservedObject var mediaManager: MediaManager = .shared
+    @ObservedObject var notificationService: NotificationService = .shared
 
     private var showsExpanded: Bool {
         windowManager.isExpanded
@@ -21,6 +22,9 @@ public struct RootView: View {
     }
 
     private var isNativeBlackStandbyHUD: Bool {
+        if !windowManager.isExpanded && notificationService.activeNotification != nil {
+            return true
+        }
         guard !windowManager.isExpanded,
               let hud = HardwareTelemetryService.shared.activeTransientHUD else { return false }
         switch hud {
@@ -31,6 +35,9 @@ public struct RootView: View {
 
     private var currentRadius: CGFloat {
         if showsExpanded { return CGFloat(settings.expandedCornerRadius) }
+        if notificationService.activeNotification != nil {
+            return notificationService.isCardExpanded ? 28.0 : CGFloat(settings.compactCornerRadius)
+        }
         if isNativeBlackStandbyHUD {
             if settings.standbyHUDStyle == .horizontalWings {
                 return CGFloat(settings.compactCornerRadius)
@@ -44,6 +51,9 @@ public struct RootView: View {
     private var currentTopEarRadius: CGFloat {
         if showsExpanded {
             return CGFloat(settings.expandedTopCornerRadius)
+        }
+        if notificationService.activeNotification != nil && notificationService.isCardExpanded {
+            return min(12.0, CGFloat(settings.compactTopCornerRadius) + 1)
         }
         if isNativeBlackStandbyHUD && settings.standbyHUDStyle == .downwardCard {
             return min(12.0, CGFloat(settings.compactTopCornerRadius) + 1)
@@ -97,25 +107,30 @@ public struct RootView: View {
     public var body: some View {
         ZStack(alignment: .top) {
             ZStack(alignment: .top) {
-                // Compact Wings (visible when collapsed and transient HUD is not active)
-                CompactNotchView(windowManager: windowManager)
-                    .opacity((showsExpanded || HardwareTelemetryService.shared.activeTransientHUD != nil) ? 0 : 1)
-                    .allowsHitTesting(!showsExpanded && HardwareTelemetryService.shared.activeTransientHUD == nil)
-
-                // Expanded Dashboard (smoothly fades & scales in from the top bezel)
-                if showsExpanded {
-                    ExpandedNotchView(windowManager: windowManager)
-                        .transition(
-                            .opacity.combined(
-                                with: .scale(scale: 0.96, anchor: .top)
-                            )
-                        )
-                }
-
-                // Transient HUD (earbuds, charging) - ALWAYS rendered inside the top notch body, whether expanded or collapsed!
-                if let hud = HardwareTelemetryService.shared.activeTransientHUD {
-                    NotchTransientHUDBar(hud: hud, isExpanded: showsExpanded)
+                if let notif = notificationService.activeNotification {
+                    NotificationNotchView(notification: notif, windowManager: windowManager)
                         .transition(.opacity)
+                } else {
+                    // Compact Wings (visible when collapsed and transient HUD is not active)
+                    CompactNotchView(windowManager: windowManager)
+                        .opacity((showsExpanded || HardwareTelemetryService.shared.activeTransientHUD != nil) ? 0 : 1)
+                        .allowsHitTesting(!showsExpanded && HardwareTelemetryService.shared.activeTransientHUD == nil)
+
+                    // Expanded Dashboard (smoothly fades & scales in from the top bezel)
+                    if showsExpanded {
+                        ExpandedNotchView(windowManager: windowManager)
+                            .transition(
+                                .opacity.combined(
+                                    with: .scale(scale: 0.96, anchor: .top)
+                                )
+                            )
+                    }
+
+                    // Transient HUD (earbuds, charging) - ALWAYS rendered inside the top notch body, whether expanded or collapsed!
+                    if let hud = HardwareTelemetryService.shared.activeTransientHUD {
+                        NotchTransientHUDBar(hud: hud, isExpanded: showsExpanded)
+                            .transition(.opacity)
+                    }
                 }
             }
             .frame(width: currentWidth, height: currentHeight, alignment: .top)
@@ -130,6 +145,12 @@ public struct RootView: View {
             .pointingHandCursor()
             .onTapGesture {
                 guard !ScreenGeometry.isMissionControlActive() else { return }
+                if notificationService.activeNotification != nil {
+                    if !notificationService.isCardExpanded {
+                        notificationService.handleNotchTap()
+                    }
+                    return
+                }
                 if !windowManager.isExpanded && settings.triggerMode != .hoverOnly {
                     windowManager.expand()
                 }
