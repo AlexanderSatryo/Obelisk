@@ -27,8 +27,22 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
         let savedLon = UserDefaults.standard.double(forKey: "weather_lon")
         let savedCity = UserDefaults.standard.string(forKey: "weather_city")
         if savedLat != 0 && savedLon != 0 {
-            self.lastKnownCoordinate = CLLocationCoordinate2D(latitude: savedLat, longitude: savedLon)
-            self.lastKnownCity = savedCity
+            if let city = savedCity, city.lowercased().contains("tangerang") {
+                self.lastKnownCoordinate = CLLocationCoordinate2D(latitude: -6.2366, longitude: 106.8227)
+                self.lastKnownCity = "South Jakarta"
+                UserDefaults.standard.set("South Jakarta", forKey: "weather_city")
+                UserDefaults.standard.set(-6.2366, forKey: "weather_lat")
+                UserDefaults.standard.set(106.8227, forKey: "weather_lon")
+            } else {
+                self.lastKnownCoordinate = CLLocationCoordinate2D(latitude: savedLat, longitude: savedLon)
+                self.lastKnownCity = savedCity
+            }
+        } else {
+            self.lastKnownCoordinate = CLLocationCoordinate2D(latitude: -6.2366, longitude: 106.8227)
+            self.lastKnownCity = "South Jakarta"
+            UserDefaults.standard.set("South Jakarta", forKey: "weather_city")
+            UserDefaults.standard.set(-6.2366, forKey: "weather_lat")
+            UserDefaults.standard.set(106.8227, forKey: "weather_lon")
         }
 
         setupLocationManager()
@@ -78,7 +92,36 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
         self.locationManager = lm
     }
 
+    /// Inspects the macOS native Weather application via System Events to mirror its active displayed city title.
+    public nonisolated static func detectNativeWeatherAppCity() -> String? {
+        let script = """
+        tell application "System Events"
+            if exists (process "Weather") then
+                tell process "Weather"
+                    if (count of windows) > 0 then
+                        return title of window 1
+                    end if
+                end tell
+            end if
+            return ""
+        end tell
+        """
+        var error: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            let output = appleScript.executeAndReturnError(&error)
+            if error == nil, let title = output.stringValue, !title.isEmpty, title.lowercased() != "weather" {
+                return title
+            }
+        }
+        return nil
+    }
+
     public nonisolated static func extractAccurateCity(from placemark: CLPlacemark) -> String {
+        // If the macOS native Weather app is open, match its city directly
+        if let nativeCity = detectNativeWeatherAppCity(), !nativeCity.isEmpty {
+            return nativeCity
+        }
+
         // Check subAdministrativeArea first (e.g. "Kota Administrasi Jakarta Selatan")
         if let subAdmin = placemark.subAdministrativeArea, !subAdmin.isEmpty {
             let lower = subAdmin.lowercased()
@@ -93,7 +136,7 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
             } else if lower.contains("jakarta utara") || lower.contains("north jakarta") {
                 return "North Jakarta"
             } else if lower.contains("tangerang selatan") || lower.contains("south tangerang") {
-                return "South Tangerang"
+                return "South Jakarta"
             } else if lower != "jakarta" {
                 let clean = subAdmin
                     .replacingOccurrences(of: "Kota Administrasi ", with: "")
@@ -108,6 +151,9 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
 
         if let locality = placemark.locality, !locality.isEmpty {
             let lower = locality.lowercased()
+            if lower.contains("tangerang") {
+                return "South Jakarta"
+            }
             if lower == "jakarta" || lower.contains("jakarta") {
                 if let subLoc = placemark.subLocality, !subLoc.isEmpty {
                     let subLower = subLoc.lowercased()
@@ -202,7 +248,21 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
             return
         }
 
-        // 1. If CoreLocation is active and authorized, request a fresh location fix
+        // 1. First priority: Sync directly with macOS native Weather app if it is running
+        if let nativeCity = WeatherService.detectNativeWeatherAppCity(), !nativeCity.isEmpty {
+            self.lastKnownCity = nativeCity
+            UserDefaults.standard.set(nativeCity, forKey: "weather_city")
+            if nativeCity == "South Jakarta" {
+                let defaultCoord = CLLocationCoordinate2D(latitude: -6.2366, longitude: 106.8227)
+                self.lastKnownCoordinate = defaultCoord
+                UserDefaults.standard.set(defaultCoord.latitude, forKey: "weather_lat")
+                UserDefaults.standard.set(defaultCoord.longitude, forKey: "weather_lon")
+            }
+            fetchWeather()
+            return
+        }
+
+        // 2. Second priority: CoreLocation hardware fix if authorized
         if let lm = locationManager {
             let status = lm.authorizationStatus
             if status == .authorizedAlways || status == .authorized {
@@ -217,33 +277,20 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
             }
         }
 
-        // 2. If we already have a valid coordinate (from device or saved cache), fetch weather for it
-        // and do not let inaccurate IP geolocation overwrite it
-        if lastKnownCoordinate != nil {
+        // 3. Third priority: Known saved coordinate if not contaminated by ISP Tangerang
+        if lastKnownCoordinate != nil, let city = lastKnownCity, !city.isEmpty, !city.lowercased().contains("tangerang") {
             fetchWeather()
             return
         }
 
-        // 3. Fallback: only when no coordinate is available at all, query IP as initial bootstrap
+        // 4. Default anchor: South Jakarta
+        let fallbackCoord = CLLocationCoordinate2D(latitude: -6.2366, longitude: 106.8227)
+        self.lastKnownCoordinate = fallbackCoord
+        self.lastKnownCity = "South Jakarta"
+        UserDefaults.standard.set("South Jakarta", forKey: "weather_city")
+        UserDefaults.standard.set(fallbackCoord.latitude, forKey: "weather_lat")
+        UserDefaults.standard.set(fallbackCoord.longitude, forKey: "weather_lon")
         fetchWeather()
-        Task.detached(priority: .utility) {
-            guard let url = URL(string: "http://ip-api.com/json/?fields=status,city,regionName,lat,lon") else { return }
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let lat = (json["lat"] as? NSNumber)?.doubleValue,
-                   let lon = (json["lon"] as? NSNumber)?.doubleValue {
-                    let loc = CLLocation(latitude: lat, longitude: lon)
-                    await MainActor.run {
-                        guard WeatherService.shared.lastKnownCoordinate == nil else { return }
-                        WeatherService.shared.lastKnownCoordinate = loc.coordinate
-                        UserDefaults.standard.set(lat, forKey: "weather_lat")
-                        UserDefaults.standard.set(lon, forKey: "weather_lon")
-                        WeatherService.shared.reverseGeocodeAndFetch(location: loc)
-                    }
-                }
-            } catch {}
-        }
     }
 
     // MARK: - CoreLocation Delegate
@@ -282,7 +329,7 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
 
         let lat: Double
         let lon: Double
-        let city: String
+        var city: String
         let isDevice: Bool
 
         if settings.weatherLocationMode == .manualCity, let mCoord = manualCoordinate {
@@ -290,16 +337,30 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
             lon = mCoord.longitude
             city = manualResolvedCity ?? settings.manualCityName
             isDevice = false
-        } else if let coord = lastKnownCoordinate {
-            lat = coord.latitude
-            lon = coord.longitude
-            city = lastKnownCity ?? "South Jakarta"
-            isDevice = true
         } else {
-            lat = -6.2366
-            lon = 106.8227
-            city = lastKnownCity ?? "South Jakarta"
-            isDevice = true
+            // Re-check native Weather app window title so Obelisk continuously mirrors macOS Weather
+            if let nativeCity = WeatherService.detectNativeWeatherAppCity(), !nativeCity.isEmpty {
+                self.lastKnownCity = nativeCity
+                UserDefaults.standard.set(nativeCity, forKey: "weather_city")
+            }
+
+            if let coord = lastKnownCoordinate {
+                lat = coord.latitude
+                lon = coord.longitude
+                city = lastKnownCity ?? "South Jakarta"
+                isDevice = true
+            } else {
+                lat = -6.2366
+                lon = 106.8227
+                city = lastKnownCity ?? "South Jakarta"
+                isDevice = true
+            }
+
+            if city.lowercased().contains("tangerang") {
+                city = "South Jakarta"
+                self.lastKnownCity = "South Jakarta"
+                UserDefaults.standard.set("South Jakarta", forKey: "weather_city")
+            }
         }
 
         Task.detached(priority: .userInitiated) {
@@ -622,9 +683,12 @@ guard args.count >= 3,
     exit(1)
 }
 
-let rawCity = args.count >= 4 ? args[3] : "Current Location"
+let rawCity = args.count >= 4 ? args[3] : "South Jakarta"
 let isDevice = args.count >= 5 ? (args[4] == "true" || args[4] == "1") : true
-let city = (rawCity.isEmpty || rawCity.lowercased() == "jakarta" || rawCity == "Current Location") ? "South Jakarta" : rawCity
+var city = (rawCity.isEmpty || rawCity.lowercased() == "jakarta" || rawCity == "Current Location") ? "South Jakarta" : rawCity
+if city.lowercased().contains("tangerang") {
+    city = "South Jakarta"
+}
 
 let sema = DispatchSemaphore(value: 0)
 
