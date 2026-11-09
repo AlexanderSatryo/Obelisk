@@ -133,6 +133,32 @@ public final class WindowManager: ObservableObject {
         startUnifiedCursorMonitor()
     }
 
+    /// Dynamically computes the balanced wing width based on the download filename and status text.
+    public func computeDownloadWingWidth(fileName: String, statusText: String?, progress: Double?) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        let nameWidth = ceil((fileName as NSString).size(withAttributes: [.font: font]).width)
+
+        // Left wing: icon (13pt) + spacing (6pt) + filename + padding (30pt for comfortable corner margins)
+        let leftRequired = 13 + 6 + nameWidth + 30
+
+        // Right wing:
+        let rightRequired: CGFloat
+        if let st = statusText, (st == "Download Complete" || st == "Download Failed") {
+            let stWidth = ceil((st as NSString).size(withAttributes: [.font: font]).width)
+            rightRequired = stWidth + 28
+        } else {
+            // Progress bar (48pt) + spacing (6pt) + size/percent text (~30-50pt) + padding (26pt)
+            let txt = statusText ?? (progress != nil ? "\(Int(round(progress! * 100)))%" : "100 MB")
+            let txtWidth = ceil((txt as NSString).size(withAttributes: [.font: font]).width)
+            rightRequired = 48 + 6 + txtWidth + 26
+        }
+
+        // Symmetrical balance: both wings match the largest required width
+        let desiredWing = max(leftRequired, rightRequired)
+        // Clamp: min 105 pt (ensures progress bar + text never get squished), max 260 pt (safe margin against menu bar items)
+        return min(max(desiredWing, 105), 260)
+    }
+
     /// Recomputes the compact notch width and height based on transient connection HUDs, active media, and user preferences.
     public func updateCompactWidth(animated: Bool = true) {
         let baseWidth = ScreenGeometry.notchSize.width
@@ -183,9 +209,15 @@ public final class WindowManager: ObservableObject {
                 targetWidth = max(380, baseWidth + 190)
                 targetHeight = customBaseHeight + NotchTransientHUDBar.extendedCardHeight
             case .horizontalWings:
-                // Symmetrical, sleek wings with generous breathing room matching the user's notch geometry (~475-570 pt total)
-                let hudExtra: CGFloat = isDownloadHUD ? 360 : ((isBatteryHUD || isVolOrBright) ? 290 : (isCapsLockHUD ? 240 : 250))
-                let extraWidth: CGFloat = max(CGFloat(settings.compactWidthOffset), hudExtra)
+                // Symmetrical, sleek wings matching dynamic content or configured presets
+                let extraWidth: CGFloat
+                if isDownloadHUD, case .download(let fileName, let statusText, _, let progress) = hud {
+                    let wingW = computeDownloadWingWidth(fileName: fileName, statusText: statusText, progress: progress)
+                    extraWidth = wingW * 2
+                } else {
+                    let hudExtra: CGFloat = (isBatteryHUD || isVolOrBright) ? 290 : (isCapsLockHUD ? 240 : 250)
+                    extraWidth = max(CGFloat(settings.compactWidthOffset), hudExtra)
+                }
                 targetWidth = baseWidth + extraWidth
                 targetHeight = customBaseHeight
             }
@@ -210,9 +242,13 @@ public final class WindowManager: ObservableObject {
             case .dynamicAuto:
                 shouldWiden = hasDownload || (!bothHidden && (hasTrack || leftAlways || rightAlways))
             }
-            let taskExtraWidth: CGFloat = hasDownload ? 260 : 0
-            let calculatedWidth = shouldWiden ? (baseWidth + CGFloat(settings.compactWidthOffset) + taskExtraWidth) : baseWidth
-            targetWidth = hasDownload ? max(calculatedWidth, baseWidth + 360) : calculatedWidth
+            if hasDownload, let first = DownloadMonitorService.shared.activeDownloads.first {
+                let statusText = first.progressFraction != nil ? nil : DownloadMonitorService.formatFileSize(first.currentBytes)
+                let wingW = computeDownloadWingWidth(fileName: first.displayName, statusText: statusText, progress: first.progressFraction)
+                targetWidth = baseWidth + (wingW * 2)
+            } else {
+                targetWidth = shouldWiden ? (baseWidth + CGFloat(settings.compactWidthOffset)) : baseWidth
+            }
             targetHeight = customBaseHeight
         }
 

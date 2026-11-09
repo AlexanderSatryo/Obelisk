@@ -364,6 +364,7 @@ public struct NotchTransientHUDBar: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .frame(maxWidth: max(0, wingWidth - 24))
         }
     }
 

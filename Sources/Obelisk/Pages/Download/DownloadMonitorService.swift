@@ -144,7 +144,7 @@ public final class DownloadMonitorService: ObservableObject {
         self.activeDownloads = currentActive
         self.isDownloading = !currentActive.isEmpty
 
-        if wasDownloading != self.isDownloading {
+        if wasDownloading != self.isDownloading || self.isDownloading {
             WindowManager.shared.updateCompactWidth(animated: true)
         }
 

@@ -104,7 +104,7 @@ public struct CompactNotchView: View {
         HStack(spacing: 0) {
             if shouldShowWings && wingWidth >= 16 {
                 HStack {
-                    leftWingView
+                    leftWingView(wingWidth: wingWidth)
                         .offset(x: 5.5)
                 }
                 .frame(width: wingWidth, alignment: .center)
@@ -129,7 +129,7 @@ public struct CompactNotchView: View {
     // MARK: - Standard Configurable Left Wing
 
     @ViewBuilder
-    private var leftWingView: some View {
+    private func leftWingView(wingWidth: CGFloat) -> some View {
         if settings.showDownloadsOnStandby, let activeDownload = downloadService.activeDownloads.first {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.down.circle")
@@ -141,6 +141,7 @@ public struct CompactNotchView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .frame(maxWidth: max(0, wingWidth - 24))
         } else {
             standardLeftWingContent
         }

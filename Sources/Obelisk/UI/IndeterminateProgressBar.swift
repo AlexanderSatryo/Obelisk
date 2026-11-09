@@ -37,3 +37,4 @@ public struct IndeterminateProgressBar: View {
         }
     }
 }
+

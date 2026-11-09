@@ -145,6 +145,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self,
+            selector: #selector(testDownloadShort),
+            name: Notification.Name("com.obelisk.testDownloadShort"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testDownloadLong),
+            name: Notification.Name("com.obelisk.testDownloadLong"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
             selector: #selector(testDownloadComplete),
             name: Notification.Name("com.obelisk.testDownloadComplete"),
             object: nil
@@ -445,6 +459,34 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 .download(
                     fileName: "Unconfirmed 5212",
                     statusText: "176 MB",
+                    isSuccess: true,
+                    progress: nil
+                ),
+                duration: 3.5
+            )
+        }
+    }
+
+    @objc private func testDownloadShort() {
+        Task { @MainActor in
+            HardwareTelemetryService.shared.triggerTransientHUD(
+                .download(
+                    fileName: "app.zip",
+                    statusText: "12 MB",
+                    isSuccess: true,
+                    progress: nil
+                ),
+                duration: 3.5
+            )
+        }
+    }
+
+    @objc private func testDownloadLong() {
+        Task { @MainActor in
+            HardwareTelemetryService.shared.triggerTransientHUD(
+                .download(
+                    fileName: "macOS_Tahoe_Developer_Preview_Build_24A102.pkg",
+                    statusText: "4.8 GB",
                     isSuccess: true,
                     progress: nil
                 ),
