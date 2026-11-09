@@ -139,16 +139,21 @@ public final class DownloadMonitorService: ObservableObject {
             )
         }
 
+        let wasDownloading = self.isDownloading
         self.knownActiveURLs = currentURLs
         self.activeDownloads = currentActive
         self.isDownloading = !currentActive.isEmpty
 
-        // Standby summary format: e.g. "↓ 64%" or "↓ 12 MB"
+        if wasDownloading != self.isDownloading {
+            WindowManager.shared.updateCompactWidth(animated: true)
+        }
+
+        // Standby summary format: e.g. "64%" or "176 MB"
         if let first = currentActive.first {
             if let frac = first.progressFraction {
-                self.standbySummaryText = "↓ \(Int(round(frac * 100)))%"
+                self.standbySummaryText = "\(Int(round(frac * 100)))%"
             } else {
-                self.standbySummaryText = "↓ \(formatFileSize(first.currentBytes))"
+                self.standbySummaryText = Self.formatFileSize(first.currentBytes)
             }
         } else {
             self.standbySummaryText = ""
@@ -175,7 +180,7 @@ public final class DownloadMonitorService: ObservableObject {
         return (current, total)
     }
 
-    private func formatFileSize(_ bytes: Int64) -> String {
+    public static func formatFileSize(_ bytes: Int64) -> String {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .file
         formatter.allowedUnits = [.useMB, .useGB]

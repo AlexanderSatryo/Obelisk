@@ -9,6 +9,7 @@ public struct RootView: View {
     @ObservedObject var mediaManager: MediaManager = .shared
     @ObservedObject var notificationService: NotificationService = .shared
     @ObservedObject var telemetry: HardwareTelemetryService = .shared
+    @ObservedObject var downloadService: DownloadMonitorService = .shared
 
     private var showsExpanded: Bool {
         windowManager.isExpanded
@@ -24,6 +25,9 @@ public struct RootView: View {
 
     private var isNativeBlackStandbyHUD: Bool {
         if !windowManager.isExpanded && notificationService.activeNotification != nil {
+            return true
+        }
+        if !windowManager.isExpanded && settings.showDownloadsOnStandby && downloadService.isDownloading {
             return true
         }
         guard !windowManager.isExpanded,

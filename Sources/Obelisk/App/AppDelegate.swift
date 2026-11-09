@@ -138,6 +138,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self,
+            selector: #selector(testDownloadIndeterminate),
+            name: Notification.Name("com.obelisk.testDownloadIndeterminate"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
             selector: #selector(testDownloadComplete),
             name: Notification.Name("com.obelisk.testDownloadComplete"),
             object: nil
@@ -426,6 +433,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                     statusText: "68%",
                     isSuccess: true,
                     progress: 0.68
+                ),
+                duration: 3.5
+            )
+        }
+    }
+
+    @objc private func testDownloadIndeterminate() {
+        Task { @MainActor in
+            HardwareTelemetryService.shared.triggerTransientHUD(
+                .download(
+                    fileName: "Unconfirmed 5212",
+                    statusText: "176 MB",
+                    isSuccess: true,
+                    progress: nil
                 ),
                 duration: 3.5
             )

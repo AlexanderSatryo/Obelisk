@@ -124,18 +124,25 @@ public struct NotchTransientHUDBar: View {
             if let frac = progress {
                 HStack(spacing: 6) {
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.18))
-                        Capsule().fill(Color.white).frame(width: max(0, min(56, 56 * CGFloat(frac))))
+                        Capsule().fill(Color.white.opacity(0.20))
+                        Capsule().fill(Color.white).frame(width: max(4, min(56, 56 * CGFloat(frac))))
                     }
                     .frame(width: 56, height: 4)
                     Text("\(Int(round(frac * 100)))%")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white)
                 }
-            } else {
+            } else if statusText == "Download Complete" || statusText == "Download Failed" {
                 Text(statusText)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(isSuccess ? .white : .white.opacity(0.75))
+            } else {
+                HStack(spacing: 6) {
+                    IndeterminateProgressBar(width: 56, height: 4)
+                    Text(statusText)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                }
             }
         case .battery(let pct, let isCharging, let statusText):
             VStack(alignment: .trailing, spacing: 5) {
@@ -451,10 +458,10 @@ public struct NotchTransientHUDBar: View {
                 HStack(spacing: 6) {
                     ZStack(alignment: .leading) {
                         Capsule()
-                            .fill(Color.white.opacity(0.18))
+                            .fill(Color.white.opacity(0.20))
                         Capsule()
                             .fill(Color.white)
-                            .frame(width: max(0, min(48, 48 * CGFloat(frac))))
+                            .frame(width: max(4, min(48, 48 * CGFloat(frac))))
                     }
                     .frame(width: 48, height: 4)
 
@@ -464,11 +471,21 @@ public struct NotchTransientHUDBar: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
                 }
-            } else {
+            } else if statusText == "Download Complete" || statusText == "Download Failed" {
                 Text(statusText)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(isSuccess ? .white : .white.opacity(0.75))
                     .lineLimit(1)
+            } else {
+                HStack(spacing: 6) {
+                    IndeterminateProgressBar(width: 48, height: 4)
+
+                    Text(statusText)
+                        .font(.system(size: 11, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
             }
         }
     }

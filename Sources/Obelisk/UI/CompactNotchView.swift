@@ -238,10 +238,10 @@ public struct CompactNotchView: View {
                 if let frac = activeDownload.progressFraction {
                     ZStack(alignment: .leading) {
                         Capsule()
-                            .fill(Color.white.opacity(0.18))
+                            .fill(Color.white.opacity(0.20))
                         Capsule()
                             .fill(Color.white)
-                            .frame(width: max(0, min(48, 48 * CGFloat(frac))))
+                            .frame(width: max(4, min(48, 48 * CGFloat(frac))))
                     }
                     .frame(width: 48, height: 4)
 
@@ -251,7 +251,9 @@ public struct CompactNotchView: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
                 } else {
-                    Text(downloadService.standbySummaryText)
+                    IndeterminateProgressBar(width: 48, height: 4)
+
+                    Text(DownloadMonitorService.formatFileSize(activeDownload.currentBytes))
                         .font(.system(size: 11, weight: .semibold))
                         .monospacedDigit()
                         .foregroundColor(.white)

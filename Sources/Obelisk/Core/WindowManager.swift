@@ -148,23 +148,33 @@ public final class WindowManager: ObservableObject {
             let isBatteryHUD: Bool
             let isVolOrBright: Bool
             let isCapsLockHUD: Bool
+            let isDownloadHUD: Bool
             switch hud {
             case .battery:
                 isBatteryHUD = true
                 isVolOrBright = false
                 isCapsLockHUD = false
+                isDownloadHUD = false
             case .volume, .brightness:
                 isBatteryHUD = false
                 isVolOrBright = true
                 isCapsLockHUD = false
+                isDownloadHUD = false
             case .capsLock:
                 isBatteryHUD = false
                 isVolOrBright = false
                 isCapsLockHUD = true
+                isDownloadHUD = false
+            case .download:
+                isBatteryHUD = false
+                isVolOrBright = false
+                isCapsLockHUD = false
+                isDownloadHUD = true
             default:
                 isBatteryHUD = false
                 isVolOrBright = false
                 isCapsLockHUD = false
+                isDownloadHUD = false
             }
 
             switch settings.standbyHUDStyle {
@@ -173,8 +183,8 @@ public final class WindowManager: ObservableObject {
                 targetWidth = max(380, baseWidth + 190)
                 targetHeight = customBaseHeight + NotchTransientHUDBar.extendedCardHeight
             case .horizontalWings:
-                // Symmetrical, sleek wings with generous breathing room matching the user's notch geometry (~475 pt total)
-                let hudExtra: CGFloat = (isBatteryHUD || isVolOrBright) ? 290 : (isCapsLockHUD ? 240 : 250)
+                // Symmetrical, sleek wings with generous breathing room matching the user's notch geometry (~475-570 pt total)
+                let hudExtra: CGFloat = isDownloadHUD ? 360 : ((isBatteryHUD || isVolOrBright) ? 290 : (isCapsLockHUD ? 240 : 250))
                 let extraWidth: CGFloat = max(CGFloat(settings.compactWidthOffset), hudExtra)
                 targetWidth = baseWidth + extraWidth
                 targetHeight = customBaseHeight
@@ -200,8 +210,9 @@ public final class WindowManager: ObservableObject {
             case .dynamicAuto:
                 shouldWiden = hasDownload || (!bothHidden && (hasTrack || leftAlways || rightAlways))
             }
-            let taskExtraWidth: CGFloat = hasDownload ? 68 : 0
-            targetWidth = shouldWiden ? (baseWidth + CGFloat(settings.compactWidthOffset) + taskExtraWidth) : baseWidth
+            let taskExtraWidth: CGFloat = hasDownload ? 260 : 0
+            let calculatedWidth = shouldWiden ? (baseWidth + CGFloat(settings.compactWidthOffset) + taskExtraWidth) : baseWidth
+            targetWidth = hasDownload ? max(calculatedWidth, baseWidth + 360) : calculatedWidth
             targetHeight = customBaseHeight
         }
 
