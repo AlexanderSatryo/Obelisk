@@ -29,7 +29,8 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
 
 5. **Download Progress Tracking**
    - Tracks active browser downloads from Safari, Chrome, Brave, Arc, and Firefox.
-   - Displays real-time download percentage, file name, and file size in the notch.
+   - Displays a smooth progress bar that fills from left to right with download percentage (`%`) and file name.
+   - Automatically dismisses when a download is cancelled or paused.
    - Shows a notification banner when a download finishes.
 
 6. **Weather and Calendar**
@@ -40,7 +41,7 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
    - Replaces default screen pop-ups with compact indicators at the notch:
      - Volume level and mute state.
      - Screen brightness level.
-     - Battery percentage, charger connection status, and remaining charge time.
+     - Battery percentage, charger connection, disconnect alert, and fully charged alert.
      - Caps Lock status.
    - Quick camera mirror to preview your front camera directly from the notch.
 
