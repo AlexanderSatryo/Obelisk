@@ -26,7 +26,6 @@ public struct NotificationNotchView: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
                 }
-                .offset(x: 5.5)
                 .frame(width: wingWidth, alignment: .center)
 
                 Spacer(minLength: notchWidth)
@@ -38,7 +37,6 @@ public struct NotificationNotchView: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
                 }
-                .offset(x: -5.5)
                 .frame(width: wingWidth, alignment: .center)
             }
         }

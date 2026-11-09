@@ -281,7 +281,6 @@ public struct NotchTransientHUDBar: View {
                 } else {
                     HStack {
                         hudLeftWingContent(wingWidth: wingWidth)
-                            .offset(x: 5.5)
                     }
                     .frame(width: wingWidth, alignment: .center)
 
@@ -289,7 +288,6 @@ public struct NotchTransientHUDBar: View {
 
                     HStack {
                         hudRightWingContent(wingWidth: wingWidth)
-                            .offset(x: -5.5)
                     }
                     .frame(width: wingWidth, alignment: .center)
                 }

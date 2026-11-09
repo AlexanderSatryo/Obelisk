@@ -228,9 +228,17 @@ public final class WindowManager: ObservableObject {
                 targetWidth = baseWidth + extraWidth
                 targetHeight = customBaseHeight
             }
-        } else if let _ = NotificationService.shared.activeNotification {
-            let notifExtra: CGFloat = 280
-            let extraWidth: CGFloat = max(CGFloat(settings.compactWidthOffset), notifExtra)
+        } else if let notif = NotificationService.shared.activeNotification {
+            let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+            let nameWidth = ceil((notif.appName as NSString).size(withAttributes: [.font: font]).width)
+            let leftContentWidth = 16 + 6 + nameWidth
+            let rightContentWidth: CGFloat = 118 // "New Notifications!"
+            let sideMargin: CGFloat = 24
+            let leftWingNeeded = leftContentWidth + (sideMargin * 2)
+            let rightWingNeeded = rightContentWidth + (sideMargin * 2)
+            let desiredWing = max(leftWingNeeded, rightWingNeeded)
+            let wingW = min(max(desiredWing, 130), 265)
+            let extraWidth = max(CGFloat(settings.compactWidthOffset), wingW * 2)
             targetWidth = baseWidth + extraWidth
             targetHeight = customBaseHeight
         } else {

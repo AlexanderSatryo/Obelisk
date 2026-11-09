@@ -120,7 +120,6 @@ public struct CompactNotchView: View {
                 } else {
                     HStack {
                         leftWingView(wingWidth: wingWidth)
-                            .offset(x: 5.5)
                     }
                     .frame(width: wingWidth, alignment: .center)
 
@@ -128,7 +127,6 @@ public struct CompactNotchView: View {
 
                     HStack {
                         rightWingView
-                            .offset(x: -5.5)
                     }
                     .frame(width: wingWidth, alignment: .center)
                 }
