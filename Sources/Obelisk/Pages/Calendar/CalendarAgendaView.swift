@@ -10,8 +10,8 @@ public struct CalendarAgendaView: View {
     @ObservedObject var calendarService: CalendarService = .shared
     @ObservedObject var settings: ObeliskSettings = .shared
 
-    public init(calendarService: CalendarService = .shared) {
-        self.calendarService = calendarService
+    public init(calendarService: CalendarService? = nil) {
+        self.calendarService = calendarService ?? .shared
     }
 
     private var calendar: Calendar { Calendar.current }

@@ -10,7 +10,10 @@ public final class LyricsService: ObservableObject {
     @Published public var currentLineText: String = ""
     @Published public var nextLineText: String = ""
     @Published public var isLoading: Bool = false
-    @Published public var isLyricsExpanded: Bool = false
+    public var isLyricsExpanded: Bool {
+        get { ObeliskSettings.shared.showLyricsInNotch }
+        set { ObeliskSettings.shared.showLyricsInNotch = newValue }
+    }
     @Published public var hasLyrics: Bool = false {
         didSet {
             if hasLyrics != oldValue {
@@ -63,7 +66,7 @@ public final class LyricsService: ObservableObject {
 
             if self.hasLyrics {
                 if ObeliskSettings.shared.autoExpandLyrics {
-                    self.isLyricsExpanded = true
+                    ObeliskSettings.shared.showLyricsInNotch = true
                     WindowManager.shared.updateHeightForCurrentTab()
                 }
                 let liveTrack = MediaManager.shared.currentTrack
@@ -72,7 +75,7 @@ public final class LyricsService: ObservableObject {
                 self.updatePosition(livePos, isPlaying: livePlaying, forceSnap: true)
             } else {
                 if ObeliskSettings.shared.autoExpandLyrics {
-                    self.isLyricsExpanded = false
+                    ObeliskSettings.shared.showLyricsInNotch = false
                     WindowManager.shared.updateHeightForCurrentTab()
                 }
                 self.currentLineText = "Lyrics not available"
@@ -91,7 +94,7 @@ public final class LyricsService: ObservableObject {
         hasLyrics = false
         isLoading = false
         if ObeliskSettings.shared.autoExpandLyrics {
-            isLyricsExpanded = false
+            ObeliskSettings.shared.showLyricsInNotch = false
             WindowManager.shared.updateHeightForCurrentTab()
         }
     }

@@ -492,7 +492,6 @@ public struct ObeliskSettingsDraft: Equatable {
     public var animationSpeed: AnimationSpeedPreset = .balanced
     public var enableHorizontalSwipe: Bool = true
     public var invertHorizontalSwipe: Bool = false
-    public var enableVerticalSwipe: Bool = true
 
     public var enableMediaTab: Bool = true
     public var enableWeatherTab: Bool = true
@@ -591,7 +590,6 @@ public struct ObeliskSettingsDraft: Equatable {
             self.animationSpeed = def.animationSpeed
             self.enableHorizontalSwipe = def.enableHorizontalSwipe
             self.invertHorizontalSwipe = def.invertHorizontalSwipe
-            self.enableVerticalSwipe = def.enableVerticalSwipe
 
         case .modules:
             self.enableMediaTab = def.enableMediaTab
@@ -783,9 +781,6 @@ public final class ObeliskSettings: ObservableObject {
     @Published public var invertHorizontalSwipe: Bool {
         didSet { defaults.set(invertHorizontalSwipe, forKey: "cfg_invertHorizontalSwipe") }
     }
-    @Published public var enableVerticalSwipe: Bool {
-        didSet { defaults.set(enableVerticalSwipe, forKey: "cfg_enableVerticalSwipe") }
-    }
 
     // MARK: 3. Modules & Tabs
     @Published public var enableMediaTab: Bool {
@@ -862,8 +857,8 @@ public final class ObeliskSettings: ObservableObject {
     @Published public var autoExpandLyrics: Bool {
         didSet {
             defaults.set(autoExpandLyrics, forKey: "cfg_autoExpandLyrics")
-            if autoExpandLyrics {
-                LyricsService.shared.isLyricsExpanded = true
+            if autoExpandLyrics && LyricsService.shared.hasLyrics {
+                showLyricsInNotch = true
                 WindowManager.shared.updateHeightForCurrentTab()
             }
         }
@@ -956,7 +951,6 @@ public final class ObeliskSettings: ObservableObject {
         self.animationSpeed = AnimationSpeedPreset(rawValue: defaults.string(forKey: "cfg_animationSpeed") ?? "") ?? .balanced
         self.enableHorizontalSwipe = defaults.object(forKey: "cfg_enableHorizontalSwipe") as? Bool ?? true
         self.invertHorizontalSwipe = defaults.object(forKey: "cfg_invertHorizontalSwipe") as? Bool ?? false
-        self.enableVerticalSwipe = defaults.object(forKey: "cfg_enableVerticalSwipe") as? Bool ?? true
 
         self.enableMediaTab = defaults.object(forKey: "cfg_enableMediaTab") as? Bool ?? true
         self.enableWeatherTab = defaults.object(forKey: "cfg_enableWeatherTab") as? Bool ?? true
@@ -1035,7 +1029,6 @@ public final class ObeliskSettings: ObservableObject {
         d.animationSpeed = animationSpeed
         d.enableHorizontalSwipe = enableHorizontalSwipe
         d.invertHorizontalSwipe = invertHorizontalSwipe
-        d.enableVerticalSwipe = enableVerticalSwipe
 
         d.enableMediaTab = enableMediaTab
         d.enableWeatherTab = enableWeatherTab
@@ -1106,7 +1099,6 @@ public final class ObeliskSettings: ObservableObject {
         animationSpeed = draft.animationSpeed
         enableHorizontalSwipe = draft.enableHorizontalSwipe
         invertHorizontalSwipe = draft.invertHorizontalSwipe
-        enableVerticalSwipe = draft.enableVerticalSwipe
 
         enableMediaTab = draft.enableMediaTab
         enableWeatherTab = draft.enableWeatherTab

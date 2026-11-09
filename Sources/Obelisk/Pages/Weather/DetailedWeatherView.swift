@@ -11,8 +11,8 @@ public struct DetailedWeatherView: View {
     @ObservedObject var weatherService: WeatherService
     @ObservedObject var settings: ObeliskSettings = .shared
 
-    public init(weatherService: WeatherService = .shared) {
-        self.weatherService = weatherService
+    public init(weatherService: WeatherService? = nil) {
+        self.weatherService = weatherService ?? .shared
     }
 
     public var body: some View {

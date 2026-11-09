@@ -5,17 +5,14 @@ import SwiftUI
 public extension Notification.Name {
     static let obeliskSwipeNext = Notification.Name("obeliskSwipeNext")
     static let obeliskSwipePrev = Notification.Name("obeliskSwipePrev")
-    static let obeliskSwipeDown = Notification.Name("obeliskSwipeDown")
-    static let obeliskSwipeUp = Notification.Name("obeliskSwipeUp")
 }
 
 /// Custom borderless, non-activating `NSPanel` anchored to the top screen bezel.
 /// Intercepts two-finger trackpad scroll events and three-finger swipe gestures before SwiftUI
-/// hosting views consume them, enabling seamless page and detail transitions.
+/// hosting views consume them, enabling seamless page transitions.
 public final class NotchWindow: NSPanel {
     private var lastSwipeTime: Date = .distantPast
     private var swipeAccumulatedX: CGFloat = 0
-    private var swipeAccumulatedY: CGFloat = 0
     private var hasTriggeredInCurrentGesture: Bool = false
 
     public init(contentRect: NSRect) {
@@ -84,13 +81,11 @@ public final class NotchWindow: NSPanel {
     private func handleScrollEvent(_ event: NSEvent) -> Bool {
         if event.phase == .began {
             swipeAccumulatedX = 0
-            swipeAccumulatedY = 0
             hasTriggeredInCurrentGesture = false
         }
 
         if event.phase == .ended || event.phase == .cancelled {
             swipeAccumulatedX = 0
-            swipeAccumulatedY = 0
             hasTriggeredInCurrentGesture = false
             return false
         }
@@ -127,31 +122,6 @@ public final class NotchWindow: NSPanel {
                 triggerNavigation(forward: invert ? false : true)
             }
             return true
-        } else if abs(dy) > abs(dx) && abs(dy) > 0.8 {
-            guard settings.enableVerticalSwipe else { return false }
-            guard !hasTriggeredInCurrentGesture else { return false }
-
-            let now = Date()
-            guard now.timeIntervalSince(lastSwipeTime) > 0.35 else { return false }
-
-            swipeAccumulatedY += dy
-
-            let thresholdY: CGFloat = 16.0
-            if swipeAccumulatedY < -thresholdY {
-                hasTriggeredInCurrentGesture = true
-                lastSwipeTime = now
-                swipeAccumulatedY = 0
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: .obeliskSwipeDown, object: nil)
-                }
-            } else if swipeAccumulatedY > thresholdY {
-                hasTriggeredInCurrentGesture = true
-                lastSwipeTime = now
-                swipeAccumulatedY = 0
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: .obeliskSwipeUp, object: nil)
-                }
-            }
         }
         return false
     }
@@ -174,16 +144,6 @@ public final class NotchWindow: NSPanel {
         } else if event.deltaX > 0.2 && settings.enableHorizontalSwipe {
             lastSwipeTime = now
             triggerNavigation(forward: invert ? false : true)
-        } else if event.deltaY < -0.2 && settings.enableVerticalSwipe {
-            lastSwipeTime = now
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .obeliskSwipeDown, object: nil)
-            }
-        } else if event.deltaY > 0.2 && settings.enableVerticalSwipe {
-            lastSwipeTime = now
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .obeliskSwipeUp, object: nil)
-            }
         } else {
             super.swipe(with: event)
         }

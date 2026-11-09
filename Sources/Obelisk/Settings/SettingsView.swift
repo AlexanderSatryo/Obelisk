@@ -114,7 +114,7 @@ public enum SettingsSearchIndex {
         // Behavior
         SettingsSearchItem(id: "trigger", title: "Trigger Mode", category: .behavior, keywords: ["trigger mode", "hover", "click", "dwell latency", "grace period", "interaction"]),
         SettingsSearchItem(id: "animation", title: "Animation Speed", category: .behavior, keywords: ["animation speed", "spring", "snappy", "balanced", "fluid", "animation curves", "transition"]),
-        SettingsSearchItem(id: "gestures", title: "Trackpad Gestures & Swipe", category: .behavior, keywords: ["gestures", "trackpad", "swipe", "two-finger page swipe", "vertical swipe"]),
+        SettingsSearchItem(id: "gestures", title: "Trackpad Gestures & Swipe", category: .behavior, keywords: ["gestures", "trackpad", "swipe", "two-finger page swipe"]),
 
         // Modules
         SettingsSearchItem(id: "mediaModule", title: "Media Player Module", category: .modules, keywords: ["media player", "music", "spotify", "apple music", "youtube", "playback"]),
@@ -960,13 +960,6 @@ public struct SettingsView: View {
                             isOn: $draft.invertHorizontalSwipe
                         )
                     }
-
-                    PreferenceToggleRow(
-                        title: "Vertical Swipe Detail Toggle",
-                        subtitle: "Swipe down to toggle expanded lyrics or weather peek",
-                        isHighlighted: matchesCurrentQuery("gestures"),
-                        isOn: $draft.enableVerticalSwipe
-                    )
                 }
             }
         }
