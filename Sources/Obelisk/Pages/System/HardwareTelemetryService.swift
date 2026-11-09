@@ -12,6 +12,7 @@ public enum NotchTransientHUD: Equatable, Hashable {
     case volume(level: Double, isMuted: Bool)
     case brightness(level: Double)
     case capsLock(isOn: Bool)
+    case download(fileName: String, statusText: String, isSuccess: Bool, progress: Double? = nil)
 }
 
 /// Monitors real-time Apple Silicon hardware telemetry (CPU load, Unified Memory, SSD disk capacity,

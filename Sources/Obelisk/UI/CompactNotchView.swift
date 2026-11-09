@@ -130,22 +130,19 @@ public struct CompactNotchView: View {
 
     @ViewBuilder
     private var leftWingView: some View {
-        HStack(spacing: 5) {
-            standardLeftWingContent
-
-            if settings.showDownloadsOnStandby && downloadService.isDownloading {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 9.5, weight: .semibold))
-                        .foregroundColor(calmSkyBlue)
-                    Text(downloadService.standbySummaryText)
-                        .font(.system(size: 9.5, weight: .bold))
-                        .foregroundColor(.white)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                }
+        if settings.showDownloadsOnStandby, let activeDownload = downloadService.activeDownloads.first {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(activeDownload.displayName)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
+        } else {
+            standardLeftWingContent
         }
     }
 
@@ -236,7 +233,34 @@ public struct CompactNotchView: View {
 
     @ViewBuilder
     private var rightWingView: some View {
-        standardRightWingContent
+        if settings.showDownloadsOnStandby, let activeDownload = downloadService.activeDownloads.first {
+            HStack(spacing: 6) {
+                if let frac = activeDownload.progressFraction {
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.18))
+                        Capsule()
+                            .fill(Color.white)
+                            .frame(width: max(0, min(48, 48 * CGFloat(frac))))
+                    }
+                    .frame(width: 48, height: 4)
+
+                    Text("\(Int(round(frac * 100)))%")
+                        .font(.system(size: 11, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                } else {
+                    Text(downloadService.standbySummaryText)
+                        .font(.system(size: 11, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+            }
+        } else {
+            standardRightWingContent
+        }
     }
 
     @ViewBuilder

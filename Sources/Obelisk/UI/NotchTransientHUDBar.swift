@@ -66,6 +66,8 @@ public struct NotchTransientHUDBar: View {
             return ("sun.max.fill", Color(red: 255/255, green: 215/255, blue: 60/255))
         case .capsLock(let isOn):
             return (isOn ? "capslock.fill" : "capslock", isOn ? .white : .white.opacity(0.55))
+        case .download(_, _, let isSuccess, _):
+            return (isSuccess ? "arrow.down.circle" : "exclamationmark.circle", .white)
         }
     }
 
@@ -83,6 +85,8 @@ public struct NotchTransientHUDBar: View {
             return "Brightness"
         case .capsLock:
             return "Caps Lock"
+        case .download(let fileName, _, _, _):
+            return fileName
         }
     }
 
@@ -100,6 +104,8 @@ public struct NotchTransientHUDBar: View {
             return "\(Int(round(level * 100)))%"
         case .capsLock(let isOn):
             return isOn ? "Caps Lock is on" : "Caps Lock is off"
+        case .download(_, let statusText, _, _):
+            return statusText
         }
     }
 
@@ -114,6 +120,23 @@ public struct NotchTransientHUDBar: View {
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 20, weight: .regular))
                 .foregroundColor(.white.opacity(0.4))
+        case .download(_, let statusText, let isSuccess, let progress):
+            if let frac = progress {
+                HStack(spacing: 6) {
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.18))
+                        Capsule().fill(Color.white).frame(width: max(0, min(56, 56 * CGFloat(frac))))
+                    }
+                    .frame(width: 56, height: 4)
+                    Text("\(Int(round(frac * 100)))%")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+            } else {
+                Text(statusText)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isSuccess ? .white : .white.opacity(0.75))
+            }
         case .battery(let pct, let isCharging, let statusText):
             VStack(alignment: .trailing, spacing: 5) {
                 HStack(spacing: 4) {
@@ -321,6 +344,19 @@ public struct NotchTransientHUDBar: View {
                     .foregroundColor(.white)
                     .lineLimit(1)
             }
+
+        case .download(let fileName, _, _, _):
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+
+                Text(fileName)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
     }
 
@@ -408,6 +444,31 @@ public struct NotchTransientHUDBar: View {
                 Text(isOn ? "On" : "Off")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(isOn ? .white : .white.opacity(0.65))
+            }
+
+        case .download(_, let statusText, let isSuccess, let progress):
+            if let frac = progress {
+                HStack(spacing: 6) {
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.18))
+                        Capsule()
+                            .fill(Color.white)
+                            .frame(width: max(0, min(48, 48 * CGFloat(frac))))
+                    }
+                    .frame(width: 48, height: 4)
+
+                    Text("\(Int(round(frac * 100)))%")
+                        .font(.system(size: 11, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+            } else {
+                Text(statusText)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(isSuccess ? .white : .white.opacity(0.75))
+                    .lineLimit(1)
             }
         }
     }

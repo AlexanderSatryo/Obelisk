@@ -122,12 +122,18 @@ public final class DownloadMonitorService: ObservableObject {
             let finishedName = cleanDownloadName(for: finishedURL)
             previousByteCounts.removeValue(forKey: finishedURL)
 
+            // Check if final destination file exists (success) or was deleted/cancelled (failed)
+            let finalTargetURL = finishedURL.deletingPathExtension()
+            let finalExists = fileManager.fileExists(atPath: finalTargetURL.path)
+            let statusText = finalExists ? "Download Complete" : "Download Failed"
+
             // Trigger elegant completion banner inside the notch
             HardwareTelemetryService.shared.triggerTransientHUD(
-                .deviceConnected(
-                    name: "Download Complete",
-                    iconName: "download",
-                    statusText: finishedName
+                .download(
+                    fileName: finishedName,
+                    statusText: statusText,
+                    isSuccess: finalExists,
+                    progress: nil
                 ),
                 duration: 3.5
             )

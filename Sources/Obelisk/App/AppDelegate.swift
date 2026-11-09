@@ -131,6 +131,27 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self,
+            selector: #selector(testDownloadProgress),
+            name: Notification.Name("com.obelisk.testDownloadProgress"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testDownloadComplete),
+            name: Notification.Name("com.obelisk.testDownloadComplete"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testDownloadFailed),
+            name: Notification.Name("com.obelisk.testDownloadFailed"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
             selector: #selector(testBatteryHUD),
             name: Notification.Name("com.obelisk.testBatteryHUD"),
             object: nil
@@ -393,6 +414,48 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             AudioPeripheralsService.shared.announceDisconnectedDevice(
                 name: "AirPods Pro",
                 icon: "airpodspro"
+            )
+        }
+    }
+
+    @objc private func testDownloadProgress() {
+        Task { @MainActor in
+            HardwareTelemetryService.shared.triggerTransientHUD(
+                .download(
+                    fileName: "Xcode_16.1.xip",
+                    statusText: "68%",
+                    isSuccess: true,
+                    progress: 0.68
+                ),
+                duration: 3.5
+            )
+        }
+    }
+
+    @objc private func testDownloadComplete() {
+        Task { @MainActor in
+            HardwareTelemetryService.shared.triggerTransientHUD(
+                .download(
+                    fileName: "Xcode_16.1.xip",
+                    statusText: "Download Complete",
+                    isSuccess: true,
+                    progress: nil
+                ),
+                duration: 3.5
+            )
+        }
+    }
+
+    @objc private func testDownloadFailed() {
+        Task { @MainActor in
+            HardwareTelemetryService.shared.triggerTransientHUD(
+                .download(
+                    fileName: "macOS_Sequoia.iso",
+                    statusText: "Download Failed",
+                    isSuccess: false,
+                    progress: nil
+                ),
+                duration: 3.5
             )
         }
     }
