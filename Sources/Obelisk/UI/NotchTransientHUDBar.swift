@@ -356,12 +356,20 @@ public struct NotchTransientHUDBar: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
+                } else if statusText == "Disconnected" || statusText == "Unplugged" {
+                    Image(systemName: "powerplug")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(calmWarmAmber)
+
+                    Text("Disconnected")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
                 } else {
                     BatteryPillBadge(percentage: pct, isCharging: isCharging)
 
                     let title: String = {
                         if isCharging { return "Charging" }
-                        if statusText == "Disconnected" || statusText == "Unplugged" { return "Disconnected" }
                         return pct <= 20 ? "Low Battery" : "Battery"
                     }()
 
@@ -513,7 +521,7 @@ public struct NotchTransientHUDBar: View {
                         .monospacedDigit()
                         .foregroundColor(isCharging ? calmSageGreen : (pct <= 20 ? calmWarmAmber : .white))
 
-                    let cleanSub = extractBatterySubtitle(statusText, pct: pct, isCharging: isCharging)
+                    let cleanSub = Self.extractBatterySubtitle(statusText, pct: pct, isCharging: isCharging)
                     if !cleanSub.isEmpty {
                         Text("•")
                             .font(.system(size: 9, weight: .semibold))
@@ -585,7 +593,7 @@ public struct NotchTransientHUDBar: View {
         }
     }
 
-    private func extractBatterySubtitle(_ statusText: String, pct: Int, isCharging: Bool) -> String {
+    public static func extractBatterySubtitle(_ statusText: String, pct: Int, isCharging: Bool) -> String {
         if statusText == "Disconnected" || statusText == "Unplugged" {
             return "On Battery"
         }

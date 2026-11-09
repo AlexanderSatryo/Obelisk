@@ -166,6 +166,55 @@ public final class WindowManager: ObservableObject {
         return min(max(desiredWing, 120), 265)
     }
 
+    /// Dynamically computes the balanced wing width for battery transient HUD notifications (including Unplug Charger / Fully Charged),
+    /// guaranteeing that both left and right content elements are precisely and symmetrically centered
+    /// between the physical MacBook Pro bezel (185 pt) and the outer notch ear curve.
+    public func computeBatteryWingWidth(statusText: String, percentage: Int, isCharging: Bool) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        let boldFont = NSFont.systemFont(ofSize: 11, weight: .bold)
+        let medFont = NSFont.systemFont(ofSize: 10.5, weight: .medium)
+
+        let leftContentWidth: CGFloat
+        if statusText.contains("Fully Charged") {
+            let textW = ceil(("Fully Charged" as NSString).size(withAttributes: [.font: font]).width)
+            leftContentWidth = 13 + 6 + textW
+        } else if statusText == "Disconnected" || statusText == "Unplugged" {
+            let textW = ceil(("Disconnected" as NSString).size(withAttributes: [.font: font]).width)
+            leftContentWidth = 14 + 6 + textW
+        } else {
+            let title = isCharging ? "Charging" : (percentage <= 20 ? "Low Battery" : "Battery")
+            let textW = ceil((title as NSString).size(withAttributes: [.font: font]).width)
+            leftContentWidth = 24 + 7 + textW
+        }
+
+        let rightContentWidth: CGFloat
+        if statusText.contains("Fully Charged") {
+            let pctW = ceil(("100%" as NSString).size(withAttributes: [.font: boldFont]).width)
+            let subW = ceil(("Unplug Charger" as NSString).size(withAttributes: [.font: medFont]).width)
+            rightContentWidth = pctW + 5 + 5 + 5 + subW
+        } else if statusText == "Disconnected" || statusText == "Unplugged" {
+            let pctStr = "\(percentage)%"
+            let pctW = ceil((pctStr as NSString).size(withAttributes: [.font: boldFont]).width)
+            let subW = ceil(("On Battery" as NSString).size(withAttributes: [.font: medFont]).width)
+            rightContentWidth = pctW + 4 + 5 + 4 + subW
+        } else {
+            let pctStr = "\(percentage)%"
+            let pctW = ceil((pctStr as NSString).size(withAttributes: [.font: boldFont]).width)
+            let cleanSub = NotchTransientHUDBar.extractBatterySubtitle(statusText, pct: percentage, isCharging: isCharging)
+            let subW = cleanSub.isEmpty ? 0 : ceil((cleanSub as NSString).size(withAttributes: [.font: medFont]).width) + 13
+            rightContentWidth = pctW + subW
+        }
+
+        // Symmetrical margin on both sides of content:
+        // Guarantees that content sits comfortably centered between outer ear and physical MacBook Pro bezel
+        let sideMargin: CGFloat = 26
+        let leftWingNeeded = leftContentWidth + (sideMargin * 2)
+        let rightWingNeeded = rightContentWidth + (sideMargin * 2)
+
+        let desiredWing = max(leftWingNeeded, rightWingNeeded)
+        return min(max(desiredWing, 140), 280)
+    }
+
     /// Recomputes the compact notch width and height based on transient connection HUDs, active media, and user preferences.
     public func updateCompactWidth(animated: Bool = true) {
         let baseWidth = ScreenGeometry.notchSize.width
@@ -220,9 +269,12 @@ public final class WindowManager: ObservableObject {
                 let extraWidth: CGFloat
                 if isDownloadHUD, case .download(let fileName, let statusText, _, let progress) = hud {
                     let wingW = computeDownloadWingWidth(fileName: fileName, statusText: statusText, progress: progress)
-                    extraWidth = wingW * 2
+                    extraWidth = max(CGFloat(settings.compactWidthOffset), wingW * 2)
+                } else if isBatteryHUD, case .battery(let pct, let isCharging, let statusText) = hud {
+                    let wingW = computeBatteryWingWidth(statusText: statusText, percentage: pct, isCharging: isCharging)
+                    extraWidth = max(CGFloat(settings.compactWidthOffset), wingW * 2)
                 } else {
-                    let hudExtra: CGFloat = (isBatteryHUD || isVolOrBright) ? 290 : (isCapsLockHUD ? 240 : 250)
+                    let hudExtra: CGFloat = isVolOrBright ? 290 : (isCapsLockHUD ? 240 : 250)
                     extraWidth = max(CGFloat(settings.compactWidthOffset), hudExtra)
                 }
                 targetWidth = baseWidth + extraWidth
