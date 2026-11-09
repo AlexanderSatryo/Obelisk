@@ -147,16 +147,24 @@ public final class WindowManager: ObservableObject {
         if let hud = HardwareTelemetryService.shared.activeTransientHUD {
             let isBatteryHUD: Bool
             let isVolOrBright: Bool
+            let isCapsLockHUD: Bool
             switch hud {
             case .battery:
                 isBatteryHUD = true
                 isVolOrBright = false
+                isCapsLockHUD = false
             case .volume, .brightness:
                 isBatteryHUD = false
                 isVolOrBright = true
+                isCapsLockHUD = false
+            case .capsLock:
+                isBatteryHUD = false
+                isVolOrBright = false
+                isCapsLockHUD = true
             default:
                 isBatteryHUD = false
                 isVolOrBright = false
+                isCapsLockHUD = false
             }
 
             switch settings.standbyHUDStyle {
@@ -166,7 +174,7 @@ public final class WindowManager: ObservableObject {
                 targetHeight = customBaseHeight + NotchTransientHUDBar.extendedCardHeight
             case .horizontalWings:
                 // Symmetrical, sleek wings with generous breathing room matching the user's notch geometry (~475 pt total)
-                let hudExtra: CGFloat = (isBatteryHUD || isVolOrBright) ? 290 : 250
+                let hudExtra: CGFloat = (isBatteryHUD || isVolOrBright) ? 290 : (isCapsLockHUD ? 240 : 250)
                 let extraWidth: CGFloat = max(CGFloat(settings.compactWidthOffset), hudExtra)
                 targetWidth = baseWidth + extraWidth
                 targetHeight = customBaseHeight

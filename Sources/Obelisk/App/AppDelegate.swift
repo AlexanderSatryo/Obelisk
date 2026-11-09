@@ -22,6 +22,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = NotificationService.shared
         RealNotificationMonitor.shared.startMonitoring()
         SystemVolumeAndBrightnessMonitor.shared.startMonitoring()
+        CapsLockMonitorService.shared.startMonitoring()
 
         NotificationCenter.default.addObserver(
             self,
@@ -97,6 +98,27 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             self,
             selector: #selector(collapseNotch),
             name: Notification.Name("com.obelisk.collapseNotch"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testCapsLockOn),
+            name: Notification.Name("com.obelisk.testCapsLockOn"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testCapsLockOff),
+            name: Notification.Name("com.obelisk.testCapsLockOff"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testEarbudsConnect),
+            name: Notification.Name("com.obelisk.testEarbudsConnect"),
             object: nil
         )
 
@@ -328,6 +350,33 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                     statusText: "Disconnected"
                 ),
                 duration: 4.0
+            )
+        }
+    }
+
+    @objc private func testCapsLockOn() {
+        Task { @MainActor in
+            HardwareTelemetryService.shared.triggerTransientHUD(
+                .capsLock(isOn: true),
+                duration: 2.5
+            )
+        }
+    }
+
+    @objc private func testCapsLockOff() {
+        Task { @MainActor in
+            HardwareTelemetryService.shared.triggerTransientHUD(
+                .capsLock(isOn: false),
+                duration: 2.5
+            )
+        }
+    }
+
+    @objc private func testEarbudsConnect() {
+        Task { @MainActor in
+            AudioPeripheralsService.shared.announceConnectedDevice(
+                name: "AirPods Pro",
+                icon: "airpodspro"
             )
         }
     }

@@ -104,7 +104,7 @@ public enum SettingsSearchIndex {
         SettingsSearchItem(id: "geometry", title: "Geometry & Dimensions", category: .appearance, keywords: ["geometry", "compact width", "compact height", "expanded width", "radius", "width", "height", "dimensions", "offset", "size"]),
         SettingsSearchItem(id: "topCornerRadius", title: "Top Bezel Corner Radius", category: .appearance, keywords: ["top radius", "top corner radius", "bezel", "ears", "compact top radius", "expanded top radius", "curvature"]),
         SettingsSearchItem(id: "bottomCornerRadius", title: "Bottom Corner Radius", category: .appearance, keywords: ["bottom radius", "bottom corner radius", "compact radius", "expanded radius", "corner radius", "curvature"]),
-        SettingsSearchItem(id: "standbyHUD", title: "Standby HUD Layout", category: .appearance, keywords: ["hud", "standby hud", "hud layout", "hud style", "volume", "brightness", "charge", "charging", "connected", "disconnected", "side expansion", "horizontal wings", "downward card", "extended card"]),
+        SettingsSearchItem(id: "standbyHUD", title: "Standby HUD Layout", category: .appearance, keywords: ["hud", "standby hud", "hud layout", "hud style", "volume", "brightness", "charge", "charging", "connected", "disconnected", "caps lock", "caps", "keyboard", "side expansion", "horizontal wings", "downward card", "extended card"]),
         SettingsSearchItem(id: "compactWings", title: "Compact Wings Mode", category: .appearance, keywords: ["compact wings", "wing expansion", "always minimal", "dynamic auto", "always wide", "wings"]),
         SettingsSearchItem(id: "leftWing", title: "Left Wing Content", category: .appearance, keywords: ["left wing", "weather mini", "battery status", "clock", "camera", "logo", "artwork", "battery", "cpu", "thumbnail"]),
         SettingsSearchItem(id: "rightWing", title: "Right Wing Style", category: .appearance, keywords: ["right wing", "waveform", "visualizer", "audio wave", "equalizer bars", "battery", "telemetry", "timer", "minimal dots"]),
@@ -870,6 +870,13 @@ public struct SettingsView: View {
                             options: StandbyHUDStyle.allCases.map { ($0, $0.title) }
                         )
                     }
+
+                    PreferenceToggleRow(
+                        title: "Show Caps Lock HUD",
+                        subtitle: "Briefly display Caps Lock On / Off status on the notch",
+                        isHighlighted: matchesCurrentQuery("standbyHUD"),
+                        isOn: $draft.showCapsLockHUD
+                    )
                 }
             }
         }

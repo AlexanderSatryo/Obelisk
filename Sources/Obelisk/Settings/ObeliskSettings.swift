@@ -480,6 +480,7 @@ public struct ObeliskSettingsDraft: Equatable {
     public var compactWidthOffset: Double = 112.0
     public var compactHeightOffset: Double = 0.0
     public var standbyHUDStyle: StandbyHUDStyle = .horizontalWings
+    public var showCapsLockHUD: Bool = true
     public var expandedWidthPreset: ExpandedWidthPreset = .standard
     public var expandedWidth: Double = 620.0
     public var expandedHeightOffset: Double = 0.0
@@ -577,6 +578,7 @@ public struct ObeliskSettingsDraft: Equatable {
             self.compactWidthOffset = def.compactWidthOffset
             self.compactHeightOffset = def.compactHeightOffset
             self.standbyHUDStyle = def.standbyHUDStyle
+            self.showCapsLockHUD = def.showCapsLockHUD
             self.expandedWidthPreset = def.expandedWidthPreset
             self.expandedWidth = def.expandedWidth
             self.expandedHeightOffset = def.expandedHeightOffset
@@ -730,6 +732,11 @@ public final class ObeliskSettings: ObservableObject {
         didSet {
             defaults.set(standbyHUDStyle.rawValue, forKey: "cfg_standbyHUDStyle")
             WindowManager.shared.updateCompactWidth(animated: true)
+        }
+    }
+    @Published public var showCapsLockHUD: Bool {
+        didSet {
+            defaults.set(showCapsLockHUD, forKey: "cfg_showCapsLockHUD")
         }
     }
     @Published public var expandedWidthPreset: ExpandedWidthPreset {
@@ -934,6 +941,7 @@ public final class ObeliskSettings: ObservableObject {
         self.compactWidthOffset = defaults.object(forKey: "cfg_compactWidthOffset") as? Double ?? 112.0
         self.compactHeightOffset = defaults.object(forKey: "cfg_compactHeightOffset") as? Double ?? 0.0
         self.standbyHUDStyle = StandbyHUDStyle(rawValue: defaults.string(forKey: "cfg_standbyHUDStyle") ?? "") ?? .horizontalWings
+        self.showCapsLockHUD = defaults.object(forKey: "cfg_showCapsLockHUD") as? Bool ?? true
         let preset = ExpandedWidthPreset(rawValue: defaults.string(forKey: "cfg_expandedWidthPreset") ?? "") ?? .standard
         self.expandedWidthPreset = preset
         // Older builds stored widths below 560 pt, which are too narrow for the current page layouts.
@@ -1015,6 +1023,7 @@ public final class ObeliskSettings: ObservableObject {
         d.compactWidthOffset = compactWidthOffset
         d.compactHeightOffset = compactHeightOffset
         d.standbyHUDStyle = standbyHUDStyle
+        d.showCapsLockHUD = showCapsLockHUD
         d.expandedWidthPreset = expandedWidthPreset
         d.expandedWidth = expandedWidth
         d.expandedHeightOffset = expandedHeightOffset
@@ -1085,6 +1094,7 @@ public final class ObeliskSettings: ObservableObject {
         compactWidthOffset = draft.compactWidthOffset
         compactHeightOffset = draft.compactHeightOffset
         standbyHUDStyle = draft.standbyHUDStyle
+        showCapsLockHUD = draft.showCapsLockHUD
         expandedWidthPreset = draft.expandedWidthPreset
         expandedWidth = draft.expandedWidth
         expandedHeightOffset = draft.expandedHeightOffset

@@ -48,9 +48,9 @@ public final class AudioPeripheralsService: NSObject, ObservableObject {
     private var btConnectNotification: IOBluetoothUserNotification?
     private var btDisconnectNotifications: [IOBluetoothUserNotification] = []
     private var lastAnnouncedDeviceName: String = ""
-    private var lastAnnouncedTime: Date = .distantPast
+    public private(set) var lastAnnouncedTime: Date = .distantPast
     private var lastAnnouncedDisconnectName: String = ""
-    private var lastAnnouncedDisconnectTime: Date = .distantPast
+    public private(set) var lastAnnouncedDisconnectTime: Date = .distantPast
     private var knownOutputDeviceNames: [AudioDeviceID: String] = [:]
     private let listenerQueue = DispatchQueue(label: "com.alxstry.obelisk.coreaudio.listener")
 

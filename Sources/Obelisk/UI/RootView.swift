@@ -29,7 +29,7 @@ public struct RootView: View {
         guard !windowManager.isExpanded,
               let hud = telemetry.activeTransientHUD else { return false }
         switch hud {
-        case .volume, .brightness, .battery, .deviceConnected, .deviceDisconnected:
+        case .volume, .brightness, .battery, .deviceConnected, .deviceDisconnected, .capsLock:
             return true
         }
     }

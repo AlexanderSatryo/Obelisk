@@ -12,6 +12,7 @@ public final class SystemVolumeAndBrightnessMonitor {
     private var lastVolume: Float32 = -1
     private var lastMute: Bool = false
     private var lastBrightness: Float = -1
+    private var lastDeviceSwitchTime: Date = .distantPast
     private var isInitialized: Bool = false
     private var pollTimer: Timer?
 
@@ -76,8 +77,12 @@ public final class SystemVolumeAndBrightnessMonitor {
             mElement: kAudioObjectPropertyElementMain
         )
         _ = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &defaultDevAddr, DispatchQueue.main) { [weak self] _, _ in
-            self?.setupAudioListener()
-            self?.checkHardwareChanges()
+            guard let self = self else { return }
+            self.setupAudioListener()
+            let (newVol, newMute) = self.readCurrentAudioState()
+            self.lastVolume = newVol
+            self.lastMute = newMute
+            self.lastDeviceSwitchTime = Date()
         }
     }
 
@@ -103,7 +108,31 @@ public final class SystemVolumeAndBrightnessMonitor {
         if volChanged || muteChanged {
             self.lastVolume = vol
             self.lastMute = mute
+
             Task { @MainActor in
+                let timeSinceDeviceSwitch = Date().timeIntervalSince(self.lastDeviceSwitchTime)
+                let isRecentDeviceSwitch = timeSinceDeviceSwitch >= 0 && timeSinceDeviceSwitch < 3.5
+
+                let timeSinceBTAnnounce = Date().timeIntervalSince(AudioPeripheralsService.shared.lastAnnouncedTime)
+                let isRecentBTAnnounce = timeSinceBTAnnounce >= 0 && timeSinceBTAnnounce < 3.5
+
+                let isDeviceHUDActive: Bool = {
+                    if let hud = HardwareTelemetryService.shared.activeTransientHUD {
+                        switch hud {
+                        case .deviceConnected, .deviceDisconnected:
+                            return true
+                        default:
+                            return false
+                        }
+                    }
+                    return false
+                }()
+
+                // Suppress volume HUD during device connection transitions so it does not overwrite the earbuds notification
+                guard !isRecentDeviceSwitch && !isRecentBTAnnounce && !isDeviceHUDActive else {
+                    return
+                }
+
                 HardwareTelemetryService.shared.triggerTransientHUD(
                     .volume(level: Double(vol), isMuted: mute),
                     duration: 1.8

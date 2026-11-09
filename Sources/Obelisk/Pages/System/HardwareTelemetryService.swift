@@ -11,6 +11,7 @@ public enum NotchTransientHUD: Equatable, Hashable {
     case battery(percentage: Int, isCharging: Bool, statusText: String)
     case volume(level: Double, isMuted: Bool)
     case brightness(level: Double)
+    case capsLock(isOn: Bool)
 }
 
 /// Monitors real-time Apple Silicon hardware telemetry (CPU load, Unified Memory, SSD disk capacity,
@@ -66,18 +67,29 @@ public final class HardwareTelemetryService: ObservableObject {
 
     /// Displays a transient HUD animation and text inside the notch body (flanking camera), whether collapsed or expanded.
     public func triggerTransientHUD(_ hud: NotchTransientHUD, duration: TimeInterval = 1.8) {
+        // Protect higher-priority device connection HUD from being overwritten by volume/brightness
+        if let active = self.activeTransientHUD {
+            switch active {
+            case .deviceConnected, .deviceDisconnected:
+                if case .volume = hud { return }
+                if case .brightness = hud { return }
+            default:
+                break
+            }
+        }
+
         hudDismissWorkItem?.cancel()
 
-        let isVolOrBright: Bool
+        let isSnappy: Bool
         switch hud {
-        case .volume, .brightness:
-            isVolOrBright = true
+        case .volume, .brightness, .capsLock:
+            isSnappy = true
         default:
-            isVolOrBright = false
+            isSnappy = false
         }
 
         // Apple signature spring: fluid, organic, slightly bouncy response like native iOS/macOS Dynamic Island
-        let springAnimation: Animation = isVolOrBright
+        let springAnimation: Animation = isSnappy
             ? .spring(response: 0.32, dampingFraction: 0.74)
             : .spring(response: 0.36, dampingFraction: 0.82)
 
@@ -91,7 +103,7 @@ public final class HardwareTelemetryService: ObservableObject {
         let work = DispatchWorkItem { [weak self] in
             Task { @MainActor in
                 guard let self = self else { return }
-                let dismissAnimation: Animation = isVolOrBright
+                let dismissAnimation: Animation = isSnappy
                     ? .spring(response: 0.28, dampingFraction: 0.84)
                     : .spring(response: 0.34, dampingFraction: 0.85)
 
