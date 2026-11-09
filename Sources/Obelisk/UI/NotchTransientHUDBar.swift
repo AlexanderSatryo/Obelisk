@@ -65,7 +65,7 @@ public struct NotchTransientHUDBar: View {
         case .brightness:
             return ("sun.max.fill", Color(red: 255/255, green: 215/255, blue: 60/255))
         case .capsLock(let isOn):
-            return (isOn ? "capslock.fill" : "capslock", isOn ? calmSageGreen : .white.opacity(0.55))
+            return (isOn ? "capslock.fill" : "capslock", isOn ? .white : .white.opacity(0.55))
         }
     }
 
@@ -324,15 +324,9 @@ public struct NotchTransientHUDBar: View {
 
         case .capsLock(let isOn):
             HStack(spacing: 7) {
-                ZStack {
-                    Circle()
-                        .fill(isOn ? calmSageGreen.opacity(0.18) : Color.white.opacity(0.10))
-                        .frame(width: 22, height: 22)
-                    Image(systemName: isOn ? "capslock.fill" : "capslock")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(isOn ? calmSageGreen : .white.opacity(0.65))
-                }
-                .frame(width: 22, height: 22)
+                Image(systemName: isOn ? "capslock.fill" : "capslock")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isOn ? .white : .white.opacity(0.65))
 
                 Text("Caps Lock")
                     .font(.system(size: 11, weight: .semibold))
@@ -435,7 +429,7 @@ public struct NotchTransientHUDBar: View {
                     .frame(width: 5, height: 5)
                 Text(isOn ? "On" : "Off")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(isOn ? calmSageGreen : .white.opacity(0.65))
+                    .foregroundColor(isOn ? .white : .white.opacity(0.65))
             }
         }
     }
