@@ -40,7 +40,7 @@ public struct NotchTransientHUDBar: View {
         switch hud {
         case .deviceConnected(_, let icon, _):
             let sym = (icon == "download") ? "arrow.down.circle.fill" : ((icon == "focus") ? "moon.fill" : icon)
-            return (sym, calmSkyBlue)
+            return (sym, .white)
         case .deviceDisconnected(_, let icon, _):
             let sym = (icon == "download") ? "arrow.down.circle" : ((icon == "focus") ? "moon" : icon)
             return (sym, .white.opacity(0.55))
@@ -109,7 +109,7 @@ public struct NotchTransientHUDBar: View {
         case .deviceConnected:
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 20, weight: .regular))
-                .foregroundColor(calmSageGreen)
+                .foregroundColor(.white)
         case .deviceDisconnected:
             Image(systemName: "xmark.circle.fill")
                 .font(.system(size: 20, weight: .regular))
@@ -286,16 +286,10 @@ public struct NotchTransientHUDBar: View {
 
         case .deviceConnected(let name, let icon, _):
             HStack(spacing: 7) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: 22, height: 22)
-                    let sym = (icon == "download") ? "arrow.down.circle.fill" : ((icon == "focus") ? "moon.fill" : icon)
-                    Image(systemName: sym)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(calmSkyBlue)
-                }
-                .frame(width: 22, height: 22)
+                let sym = (icon == "download") ? "arrow.down.circle.fill" : ((icon == "focus") ? "moon.fill" : icon)
+                Image(systemName: sym)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
 
                 Text(name)
                     .font(.system(size: 11, weight: .semibold))
@@ -305,16 +299,10 @@ public struct NotchTransientHUDBar: View {
 
         case .deviceDisconnected(let name, let icon, _):
             HStack(spacing: 7) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 22, height: 22)
-                    let sym = (icon == "download") ? "arrow.down.circle" : ((icon == "focus") ? "moon" : icon)
-                    Image(systemName: sym)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.55))
-                }
-                .frame(width: 22, height: 22)
+                let sym = (icon == "download") ? "arrow.down.circle" : ((icon == "focus") ? "moon" : icon)
+                Image(systemName: sym)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.65))
 
                 Text(name)
                     .font(.system(size: 11, weight: .semibold))
@@ -403,24 +391,14 @@ public struct NotchTransientHUDBar: View {
             }
 
         case .deviceConnected(_, _, let statusText):
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(calmSageGreen)
-                    .frame(width: 5, height: 5)
-                Text(statusText)
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundColor(calmSageGreen)
-            }
+            Text(statusText)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.white)
 
         case .deviceDisconnected(_, _, let statusText):
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color.white.opacity(0.35))
-                    .frame(width: 5, height: 5)
-                Text(statusText)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundColor(.white.opacity(0.65))
-            }
+            Text(statusText)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.65))
 
         case .capsLock(let isOn):
             HStack(spacing: 5) {

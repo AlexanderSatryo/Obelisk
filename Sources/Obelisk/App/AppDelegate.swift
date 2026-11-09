@@ -124,6 +124,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self,
+            selector: #selector(testEarbudsDisconnect),
+            name: Notification.Name("com.obelisk.testEarbudsDisconnect"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
             selector: #selector(testBatteryHUD),
             name: Notification.Name("com.obelisk.testBatteryHUD"),
             object: nil
@@ -375,6 +382,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func testEarbudsConnect() {
         Task { @MainActor in
             AudioPeripheralsService.shared.announceConnectedDevice(
+                name: "AirPods Pro",
+                icon: "airpodspro"
+            )
+        }
+    }
+
+    @objc private func testEarbudsDisconnect() {
+        Task { @MainActor in
+            AudioPeripheralsService.shared.announceDisconnectedDevice(
                 name: "AirPods Pro",
                 icon: "airpodspro"
             )
