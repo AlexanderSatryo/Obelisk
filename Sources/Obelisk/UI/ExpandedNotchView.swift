@@ -186,11 +186,19 @@ public struct ExpandedNotchView: View {
                 DragGesture(minimumDistance: 15)
                     .onChanged { value in
                         guard settings.enableHorizontalSwipe else { return }
+                        // Prevent horizontal drag conflict when user is scrolling vertically
+                        guard abs(value.translation.width) > abs(value.translation.height) * 1.3 else { return }
                         dragOffset = value.translation.width * 0.4
                     }
                     .onEnded { value in
                         guard settings.enableHorizontalSwipe else {
                             dragOffset = 0
+                            return
+                        }
+                        guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                dragOffset = 0
+                            }
                             return
                         }
                         let threshold: CGFloat = 30

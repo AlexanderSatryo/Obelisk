@@ -140,15 +140,16 @@ public struct NotificationHistoryView: View {
             }
             .padding(.horizontal, 2)
 
-            // Scrollable Recent Notifications List
-            ScrollView(.vertical, showsIndicators: true) {
-                LazyVStack(spacing: 4) {
+            // Scrollable Recent Notifications List with Smooth Inertia & Overlay Scroller
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 5) {
                     ForEach(notificationService.recentNotifications) { item in
                         notificationRow(item)
                     }
                 }
-                .padding(.vertical, 1)
+                .padding(.vertical, 2)
             }
+            .background(SmoothScrollViewConfigurator())
         }
     }
 
@@ -173,32 +174,33 @@ public struct NotificationHistoryView: View {
 
                     Spacer(minLength: 6)
 
-                    if isHovered {
-                        HStack(spacing: 5) {
-                            Button(action: {
-                                notificationService.openNotificationApp(item)
-                            }) {
-                                Image(systemName: "arrow.up.forward.app.fill")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.85))
-                                    .frame(width: 16, height: 16)
-                            }
-                            .buttonStyle(.plain)
-                            .pointingHandCursor()
-
-                            Button(action: {
-                                notificationService.removeRecentNotification(id: item.id)
-                            }) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 8.5, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.65))
-                                    .frame(width: 16, height: 16)
-                            }
-                            .buttonStyle(.plain)
-                            .pointingHandCursor()
+                    // Action buttons with fixed presence to avoid layout shifts during fast scrolling
+                    HStack(spacing: 5) {
+                        Button(action: {
+                            notificationService.openNotificationApp(item)
+                        }) {
+                            Image(systemName: "arrow.up.forward.app.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.85))
+                                .frame(width: 16, height: 16)
                         }
-                        .transition(.opacity)
+                        .buttonStyle(.plain)
+                        .pointingHandCursor()
+
+                        Button(action: {
+                            notificationService.removeRecentNotification(id: item.id)
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 8.5, weight: .bold))
+                                .foregroundColor(.white.opacity(0.65))
+                                .frame(width: 16, height: 16)
+                        }
+                        .buttonStyle(.plain)
+                        .pointingHandCursor()
                     }
+                    .opacity(isHovered ? 1 : 0)
+                    .allowsHitTesting(isHovered)
+                    .animation(.easeInOut(duration: 0.15), value: isHovered)
 
                     Text(item.formattedTimeAgo)
                         .font(.system(size: 11, weight: .regular))
@@ -341,17 +343,29 @@ public struct NotificationHistoryView: View {
         .frame(width: avatarSize + 3, height: avatarSize + 3)
     }
 
+    private static var contactImageCache: [String: NSImage] = [:]
+    private static var contactImageNegativeCache: Set<String> = []
+    private static let contactStore = CNContactStore()
+
     private func resolveContactImage(for name: String) -> NSImage? {
         guard !name.isEmpty else { return nil }
+        if let cached = Self.contactImageCache[name] {
+            return cached
+        }
+        if Self.contactImageNegativeCache.contains(name) {
+            return nil
+        }
         if CNContactStore.authorizationStatus(for: .contacts) == .authorized {
-            let store = CNContactStore()
             let predicate = CNContact.predicateForContacts(matchingName: name)
-            if let list = try? store.unifiedContacts(matching: predicate, keysToFetch: [CNContactThumbnailImageDataKey as CNKeyDescriptor]),
+            if let list = try? Self.contactStore.unifiedContacts(matching: predicate, keysToFetch: [CNContactThumbnailImageDataKey as CNKeyDescriptor]),
                let first = list.first(where: { $0.thumbnailImageData != nil }),
-               let data = first.thumbnailImageData {
-                return NSImage(data: data)
+               let data = first.thumbnailImageData,
+               let image = NSImage(data: data) {
+                Self.contactImageCache[name] = image
+                return image
             }
         }
+        Self.contactImageNegativeCache.insert(name)
         return nil
     }
 
@@ -379,4 +393,31 @@ public struct NotificationHistoryView: View {
         let colors = palettes[hash % palettes.count]
         return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
+}
+
+// MARK: - Native macOS Smooth Momentum & Elastic Scroll Configurator
+
+/// Configures the enclosing AppKit `NSScrollView` for fluid, momentum-based scrolling,
+/// vertical axis lock, and auto-hiding overlay scrollers matching macOS native feel.
+public struct SmoothScrollViewConfigurator: NSViewRepresentable {
+    public init() {}
+
+    public func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            guard let scrollView = view.enclosingScrollView else { return }
+            scrollView.verticalScrollElasticity = .allowed
+            scrollView.horizontalScrollElasticity = .none
+            scrollView.usesPredominantAxisScrolling = true
+            scrollView.hasVerticalScroller = true
+            scrollView.hasHorizontalScroller = false
+            scrollView.autohidesScrollers = true
+            scrollView.scrollerStyle = .overlay
+            scrollView.scrollerKnobStyle = .light
+            scrollView.contentView.postsBoundsChangedNotifications = true
+        }
+        return view
+    }
+
+    public func updateNSView(_ nsView: NSView, context: Context) {}
 }
