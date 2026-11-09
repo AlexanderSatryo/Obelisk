@@ -106,21 +106,17 @@ public struct CompactNotchView: View {
         HStack(spacing: 0) {
             if shouldShowWings && wingWidth >= 16 {
                 if isDownload {
-                    HStack(spacing: 0) {
-                        Spacer().frame(width: 14)
+                    HStack {
                         leftWingView(wingWidth: wingWidth)
-                        Spacer(minLength: 0)
                     }
-                    .frame(width: wingWidth)
+                    .frame(width: wingWidth, alignment: .center)
 
                     Spacer(minLength: notchWidth)
 
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
+                    HStack {
                         rightWingView
-                        Spacer().frame(width: 14)
                     }
-                    .frame(width: wingWidth)
+                    .frame(width: wingWidth, alignment: .center)
                 } else {
                     HStack {
                         leftWingView(wingWidth: wingWidth)

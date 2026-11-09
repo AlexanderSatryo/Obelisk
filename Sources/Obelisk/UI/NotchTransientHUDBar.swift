@@ -267,21 +267,17 @@ public struct NotchTransientHUDBar: View {
         return HStack(spacing: 0) {
             if wingWidth >= 16 {
                 if isDownloadHUD {
-                    HStack(spacing: 0) {
-                        Spacer().frame(width: 14)
+                    HStack {
                         hudLeftWingContent(wingWidth: wingWidth)
-                        Spacer(minLength: 0)
                     }
-                    .frame(width: wingWidth)
+                    .frame(width: wingWidth, alignment: .center)
 
                     Spacer(minLength: notchWidth)
 
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
+                    HStack {
                         hudRightWingContent(wingWidth: wingWidth)
-                        Spacer().frame(width: 14)
                     }
-                    .frame(width: wingWidth)
+                    .frame(width: wingWidth, alignment: .center)
                 } else {
                     HStack {
                         hudLeftWingContent(wingWidth: wingWidth)

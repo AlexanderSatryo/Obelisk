@@ -133,30 +133,37 @@ public final class WindowManager: ObservableObject {
         startUnifiedCursorMonitor()
     }
 
-    /// Dynamically computes the balanced wing width based on the download filename and status text.
+    /// Dynamically computes the balanced wing width based on the download filename and status text,
+    /// ensuring content is centered with comfortable breathing room between the physical bezel and outer edge.
     public func computeDownloadWingWidth(fileName: String, statusText: String?, progress: Double?) -> CGFloat {
         let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
         let nameWidth = ceil((fileName as NSString).size(withAttributes: [.font: font]).width)
 
-        // Left wing: outer margin (14pt) + icon (13pt) + spacing (6pt) + filename + inner margin to bezel (16pt)
-        let leftRequired = 14 + 13 + 6 + nameWidth + 16
+        // Left wing content width: icon (13pt) + spacing (6pt) + filename
+        let leftContentWidth = 13 + 6 + nameWidth
 
-        // Right wing:
-        let rightRequired: CGFloat
+        // Right wing content width:
+        let rightContentWidth: CGFloat
         if let st = statusText, (st == "Download Complete" || st == "Download Failed") {
             let stWidth = ceil((st as NSString).size(withAttributes: [.font: font]).width)
-            rightRequired = 14 + stWidth + 16
+            rightContentWidth = stWidth
         } else {
-            // outer margin (14pt) + progress bar (48pt) + spacing (6pt) + size/percent text + inner margin to bezel (16pt)
             let txt = statusText ?? (progress != nil ? "\(Int(round(progress! * 100)))%" : "100 MB")
             let txtWidth = ceil((txt as NSString).size(withAttributes: [.font: font]).width)
-            rightRequired = 14 + 48 + 6 + txtWidth + 16
+            // progress bar (48pt) + spacing (6pt) + size/percent text
+            rightContentWidth = 48 + 6 + txtWidth
         }
 
-        // Symmetrical balance: both wings match the largest required width
-        let desiredWing = max(leftRequired, rightRequired)
-        // Clamp: min 110 pt, max 260 pt (safe margin against menu bar items)
-        return min(max(desiredWing, 110), 260)
+        // Symmetrical margin on both sides of content:
+        // Ensures content sits comfortably centered between outer edge and physical bezel with at least 24pt margin.
+        let sideMargin: CGFloat = 24
+        let leftWingNeeded = leftContentWidth + (sideMargin * 2)
+        let rightWingNeeded = rightContentWidth + (sideMargin * 2)
+
+        // Symmetrical balance: both wings match the larger required width
+        let desiredWing = max(leftWingNeeded, rightWingNeeded)
+        // Clamp: min 120 pt, max 265 pt (safe margin against macOS menu bar items)
+        return min(max(desiredWing, 120), 265)
     }
 
     /// Recomputes the compact notch width and height based on transient connection HUDs, active media, and user preferences.
