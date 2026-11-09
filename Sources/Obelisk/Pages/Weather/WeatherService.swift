@@ -19,6 +19,7 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
     private var manualCoordinate: CLLocationCoordinate2D?
     private var manualResolvedCity: String?
     private var refreshTimer: Timer?
+    private var lastWeatherFetchTime: Date = .distantPast
 
     private override init() {
         super.init()
@@ -318,12 +319,19 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
     nonisolated public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
 
     /// Fetches real-time meteorological telemetry from Open-Meteo for the active coordinates.
-    public func fetchWeather() {
+    public func fetchWeather(force: Bool = false) {
         let settings = ObeliskSettings.shared
         if settings.weatherLocationMode == .manualCity && manualCoordinate == nil {
             geocodeManualCityAndFetch(settings.manualCityName)
             return
         }
+
+        // Cache guard: avoid spawning subprocess runners during interactive tab swipes if data is fresh (< 5 mins)
+        let now = Date()
+        if !force && now.timeIntervalSince(lastWeatherFetchTime) < 300 && weather.temperature != 0 && !weather.cityName.isEmpty {
+            return
+        }
+        lastWeatherFetchTime = now
 
         isLoading = true
 

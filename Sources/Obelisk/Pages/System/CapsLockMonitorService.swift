@@ -69,3 +69,4 @@ public final class CapsLockMonitorService: ObservableObject {
         )
     }
 }
+

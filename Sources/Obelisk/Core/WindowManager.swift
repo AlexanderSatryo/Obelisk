@@ -616,9 +616,6 @@ public final class WindowManager: ObservableObject {
 
     /// Switches directly to the specified tab and updates the container height.
     public func switchToTab(_ tab: ObeliskTab, updateLastActiveTab: Bool = true) {
-        if tab == .weather {
-            WeatherService.shared.fetchWeather()
-        }
         let resp = ObeliskSettings.shared.animationSpeed.expandResponse
         withAnimation(.spring(response: resp, dampingFraction: 0.82)) {
             self.currentTab = tab
@@ -642,9 +639,6 @@ public final class WindowManager: ObservableObject {
             nextIndex = (currentIndex - 1 + enabled.count) % enabled.count
         }
         let nextTab = enabled[nextIndex]
-        if nextTab == .weather {
-            WeatherService.shared.fetchWeather()
-        }
 
         let resp = ObeliskSettings.shared.animationSpeed.expandResponse
         withAnimation(.spring(response: resp, dampingFraction: 0.82)) {

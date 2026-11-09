@@ -15,7 +15,6 @@ public struct ExpandedNotchView: View {
     @ObservedObject var telemetry: HardwareTelemetryService = .shared
 
     @Namespace private var tabAnimation
-    @State private var dragOffset: CGFloat = 0
 
     private var batteryStatusSubtitle: String {
         if telemetry.isCharging {
@@ -171,7 +170,7 @@ public struct ExpandedNotchView: View {
                 CameraMirrorView()
             }
 
-            // Dynamic Tab Content with Trackpad Swipe & Drag
+            // Dynamic Tab Content (smooth page transition via native AppKit trackpad gesture)
             ZStack {
                 NotchPageView(tab: windowManager.currentTab)
                     .id(windowManager.currentTab)
@@ -180,39 +179,7 @@ public struct ExpandedNotchView: View {
             .padding(.horizontal, contentInset)
             .padding(.bottom, 14)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .offset(x: dragOffset)
             .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 15)
-                    .onChanged { value in
-                        guard settings.enableHorizontalSwipe else { return }
-                        // Prevent horizontal drag conflict when user is scrolling vertically
-                        guard abs(value.translation.width) > abs(value.translation.height) * 1.3 else { return }
-                        dragOffset = value.translation.width * 0.4
-                    }
-                    .onEnded { value in
-                        guard settings.enableHorizontalSwipe else {
-                            dragOffset = 0
-                            return
-                        }
-                        guard abs(value.translation.width) > abs(value.translation.height) * 1.2 else {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                                dragOffset = 0
-                            }
-                            return
-                        }
-                        let threshold: CGFloat = 30
-                        let invert = settings.invertHorizontalSwipe
-                        if value.translation.width < -threshold {
-                            windowManager.navigateTab(forward: invert ? true : false)
-                        } else if value.translation.width > threshold {
-                            windowManager.navigateTab(forward: invert ? false : true)
-                        }
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                            dragOffset = 0
-                        }
-                    }
-            )
 
         }
         .frame(

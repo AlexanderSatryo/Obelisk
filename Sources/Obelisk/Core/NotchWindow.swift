@@ -74,12 +74,14 @@ public final class NotchWindow: NSPanel {
             }
         }
         if event.type == .scrollWheel {
-            handleScrollEvent(event)
+            if handleScrollEvent(event) {
+                return
+            }
         }
         super.sendEvent(event)
     }
 
-    private func handleScrollEvent(_ event: NSEvent) {
+    private func handleScrollEvent(_ event: NSEvent) -> Bool {
         if event.phase == .began {
             swipeAccumulatedX = 0
             swipeAccumulatedY = 0
@@ -90,28 +92,28 @@ public final class NotchWindow: NSPanel {
             swipeAccumulatedX = 0
             swipeAccumulatedY = 0
             hasTriggeredInCurrentGesture = false
-            return
+            return false
         }
 
         if !event.momentumPhase.isEmpty && event.momentumPhase != [] {
-            return
+            return false
         }
-
-        guard !hasTriggeredInCurrentGesture else { return }
-
-        let now = Date()
-        guard now.timeIntervalSince(lastSwipeTime) > 0.35 else { return }
 
         let dx = event.hasPreciseScrollingDeltas ? event.scrollingDeltaX : (event.deltaX * 10)
         let dy = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : (event.deltaY * 10)
 
         let settings = ObeliskSettings.shared
 
-        if abs(dx) > abs(dy) && abs(dx) > 0.8 {
-            guard settings.enableHorizontalSwipe else { return }
+        if abs(dx) > abs(dy) && abs(dx) > 0.6 {
+            guard settings.enableHorizontalSwipe && WindowManager.shared.isExpanded else { return false }
+            guard !hasTriggeredInCurrentGesture else { return true }
+
+            let now = Date()
+            guard now.timeIntervalSince(lastSwipeTime) > 0.28 else { return true }
+
             swipeAccumulatedX += dx
 
-            let threshold: CGFloat = 16.0
+            let threshold: CGFloat = 22.0
             let invert = settings.invertHorizontalSwipe
             if swipeAccumulatedX < -threshold {
                 hasTriggeredInCurrentGesture = true
@@ -124,8 +126,14 @@ public final class NotchWindow: NSPanel {
                 swipeAccumulatedX = 0
                 triggerNavigation(forward: invert ? false : true)
             }
+            return true
         } else if abs(dy) > abs(dx) && abs(dy) > 0.8 {
-            guard settings.enableVerticalSwipe else { return }
+            guard settings.enableVerticalSwipe else { return false }
+            guard !hasTriggeredInCurrentGesture else { return false }
+
+            let now = Date()
+            guard now.timeIntervalSince(lastSwipeTime) > 0.35 else { return false }
+
             swipeAccumulatedY += dy
 
             let thresholdY: CGFloat = 16.0
@@ -145,6 +153,7 @@ public final class NotchWindow: NSPanel {
                 }
             }
         }
+        return false
     }
 
     override public func swipe(with event: NSEvent) {
@@ -181,16 +190,14 @@ public final class NotchWindow: NSPanel {
     }
 
     private func triggerNavigation(forward: Bool) {
-        DispatchQueue.main.async {
-            Task { @MainActor in
-                guard !ScreenGeometry.isMissionControlActive() else { return }
-                guard WindowManager.shared.isExpanded else { return }
-                WindowManager.shared.navigateTab(forward: forward)
-                NotificationCenter.default.post(
-                    name: forward ? .obeliskSwipeNext : .obeliskSwipePrev,
-                    object: nil
-                )
-            }
+        Task { @MainActor in
+            guard !ScreenGeometry.isMissionControlActive() else { return }
+            guard WindowManager.shared.isExpanded else { return }
+            WindowManager.shared.navigateTab(forward: forward)
+            NotificationCenter.default.post(
+                name: forward ? .obeliskSwipeNext : .obeliskSwipePrev,
+                object: nil
+            )
         }
     }
 }
