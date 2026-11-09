@@ -541,6 +541,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    public func applicationWillTerminate(_ notification: Notification) {
+        RealNotificationMonitor.shared.stopMonitoring()
+        SystemVolumeAndBrightnessMonitor.shared.stopMonitoring()
+        CapsLockMonitorService.shared.stopMonitoring()
+        DownloadMonitorService.shared.stopMonitoring()
+        WindowManager.shared.stopUnifiedCursorMonitor()
+    }
+
     @objc private func openSettings() {
         SettingsWindowManager.shared.showSettings()
     }

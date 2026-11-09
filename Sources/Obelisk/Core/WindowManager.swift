@@ -421,7 +421,7 @@ public final class WindowManager: ObservableObject {
         // independent of timer scheduling, on desktop, in windowed apps, and in fullscreen.
         if globalMouseMonitor == nil {
             globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged]) { [weak self] _ in
-                Task { @MainActor in
+                DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     if self.isExpanded {
                         self.checkExpandedCursorPosition()
@@ -435,7 +435,7 @@ public final class WindowManager: ObservableObject {
         // The compact window is click-through, so clicks on the notch are detected globally instead.
         if globalClickMonitor == nil {
             globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
-                Task { @MainActor in
+                DispatchQueue.main.async { [weak self] in
                     guard let self = self, !self.isExpanded, !self.isCollapsing else { return }
                     guard ObeliskSettings.shared.triggerMode != .hoverOnly else { return }
                     let notchRect = ScreenGeometry.notchFrame(for: self.currentCompactSize)
@@ -447,7 +447,7 @@ public final class WindowManager: ObservableObject {
         }
 
         let timer = Timer(timeInterval: 0.035, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 guard let self = self else { return }
                 if self.isExpanded {
                     self.checkExpandedCursorPosition()
@@ -458,6 +458,24 @@ public final class WindowManager: ObservableObject {
         }
         RunLoop.main.add(timer, forMode: .common)
         self.cursorMonitorTimer = timer
+    }
+
+    /// Stops the global screen cursor monitor and removes event hooks.
+    public func stopUnifiedCursorMonitor() {
+        cursorMonitorTimer?.invalidate()
+        cursorMonitorTimer = nil
+        if let m = globalMouseMonitor {
+            NSEvent.removeMonitor(m)
+            globalMouseMonitor = nil
+        }
+        if let c = globalClickMonitor {
+            NSEvent.removeMonitor(c)
+            globalClickMonitor = nil
+        }
+        if let token = appActivityToken {
+            ProcessInfo.processInfo.endActivity(token)
+            appActivityToken = nil
+        }
     }
 
     private static var lastConsumedDragChangeCount: Int = NSPasteboard(name: .drag).changeCount

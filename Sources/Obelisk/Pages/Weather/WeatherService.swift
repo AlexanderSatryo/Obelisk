@@ -28,16 +28,8 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
         let savedLon = UserDefaults.standard.double(forKey: "weather_lon")
         let savedCity = UserDefaults.standard.string(forKey: "weather_city")
         if savedLat != 0 && savedLon != 0 {
-            if let city = savedCity, city.lowercased().contains("tangerang") {
-                self.lastKnownCoordinate = CLLocationCoordinate2D(latitude: -6.2366, longitude: 106.8227)
-                self.lastKnownCity = "South Jakarta"
-                UserDefaults.standard.set("South Jakarta", forKey: "weather_city")
-                UserDefaults.standard.set(-6.2366, forKey: "weather_lat")
-                UserDefaults.standard.set(106.8227, forKey: "weather_lon")
-            } else {
-                self.lastKnownCoordinate = CLLocationCoordinate2D(latitude: savedLat, longitude: savedLon)
-                self.lastKnownCity = savedCity
-            }
+            self.lastKnownCoordinate = CLLocationCoordinate2D(latitude: savedLat, longitude: savedLon)
+            self.lastKnownCity = savedCity
         } else {
             self.lastKnownCoordinate = CLLocationCoordinate2D(latitude: -6.2366, longitude: 106.8227)
             self.lastKnownCity = "South Jakarta"
@@ -95,6 +87,10 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
 
     /// Inspects the macOS native Weather application via System Events to mirror its active displayed city title.
     public nonisolated static func detectNativeWeatherAppCity() -> String? {
+        guard !NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.weather").isEmpty else {
+            return nil
+        }
+
         let script = """
         tell application "System Events"
             if exists (process "Weather") then

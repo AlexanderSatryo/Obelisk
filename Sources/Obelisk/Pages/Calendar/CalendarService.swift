@@ -233,6 +233,9 @@ public final class CalendarService: ObservableObject {
                 let ekEvents = store.events(matching: pred)
 
                 var items: [CalendarItem] = []
+                let df = DateFormatter()
+                df.dateFormat = "EEE, HH:mm"
+
                 for ev in ekEvents {
                     var r: Double? = nil
                     var g: Double? = nil
@@ -247,8 +250,6 @@ public final class CalendarService: ObservableObject {
                     if ev.isAllDay {
                         timeStr = "All Day"
                     } else if let s = ev.startDate {
-                        let df = DateFormatter()
-                        df.dateFormat = "EEE, HH:mm"
                         timeStr = df.string(from: s)
                     } else {
                         timeStr = ""

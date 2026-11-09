@@ -188,8 +188,7 @@ public struct ExpandedNotchView: View {
             alignment: .top
         )
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            let lock = NSLock()
-            var found: [URL] = []
+            let collector = URLDropCollector()
             let group = DispatchGroup()
             for provider in providers where provider.hasItemConformingToTypeIdentifier("public.file-url") {
                 group.enter()
@@ -202,15 +201,14 @@ public struct ExpandedNotchView: View {
                         resolved = url
                     }
                     if let resolved {
-                        lock.lock()
-                        found.append(resolved)
-                        lock.unlock()
+                        collector.append(resolved)
                     }
                 }
             }
             group.notify(queue: .main) {
-                guard !found.isEmpty else { return }
-                FileTrayService.shared.addFiles(urls: found)
+                let urls = collector.collect()
+                guard !urls.isEmpty else { return }
+                FileTrayService.shared.addFiles(urls: urls)
             }
             return true
         }

@@ -24,7 +24,7 @@ public enum AudioTransportCategory: String {
 }
 
 /// Represents a unified selectable audio output route (either an active CoreAudio output or paired Bluetooth earbuds).
-public struct AudioRouteOption: Identifiable, Equatable {
+public struct AudioRouteOption: Identifiable, Equatable, Sendable {
     public let id: String
     public let name: String
     public let iconName: String
@@ -123,6 +123,7 @@ public final class AudioPeripheralsService: NSObject, ObservableObject {
         if let caID = route.coreAudioID {
             selectOutputDevice(caID)
         } else if let btAddr = route.bluetoothAddress {
+            let targetRouteName = route.name
             Task.detached(priority: .userInitiated) {
                 if let btDevice = IOBluetoothDevice(addressString: btAddr) {
                     if !btDevice.isConnected() {
@@ -135,7 +136,7 @@ public final class AudioPeripheralsService: NSObject, ObservableObject {
                     let switched = await MainActor.run { () -> Bool in
                         AudioPeripheralsService.shared.refreshAudioDevices()
                         if let match = AudioPeripheralsService.shared.selectableRoutes.first(where: {
-                            $0.coreAudioID != nil && $0.name.localizedCaseInsensitiveContains(route.name)
+                            $0.coreAudioID != nil && $0.name.localizedCaseInsensitiveContains(targetRouteName)
                         }), let targetID = match.coreAudioID {
                             AudioPeripheralsService.shared.selectOutputDevice(targetID)
                             return true

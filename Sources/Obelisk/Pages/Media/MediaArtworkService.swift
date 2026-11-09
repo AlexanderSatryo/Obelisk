@@ -5,8 +5,16 @@ import AppKit
 public final class MediaArtworkService {
     public static let shared = MediaArtworkService()
 
-    private var artworkCache: [String: NSImage] = [:]
-    private var logoCache: [String: NSImage] = [:]
+    private let artworkCache: NSCache<NSString, NSImage> = {
+        let c = NSCache<NSString, NSImage>()
+        c.countLimit = 150
+        return c
+    }()
+    private let logoCache: NSCache<NSString, NSImage> = {
+        let c = NSCache<NSString, NSImage>()
+        c.countLimit = 100
+        return c
+    }()
     private var inFlightArtworkKeys: Set<String> = []
     private var inFlightLogoKeys: Set<String> = []
 
@@ -282,5 +290,18 @@ public final class MediaArtworkService {
                 }
             }.resume()
         }.resume()
+    }
+}
+
+private extension NSCache where KeyType == NSString, ObjectType == NSImage {
+    subscript(key: String) -> NSImage? {
+        get { object(forKey: key as NSString) }
+        set {
+            if let newValue {
+                setObject(newValue, forKey: key as NSString)
+            } else {
+                removeObject(forKey: key as NSString)
+            }
+        }
     }
 }

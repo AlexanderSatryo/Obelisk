@@ -47,7 +47,7 @@ public final class BiometricPrivacyService: ObservableObject {
     /// Evaluates biometrics (or device passcode if biometrics are unavailable) to unlock the notification card.
     public func authenticate(
         reason: String = "Touch ID to view recent notifications",
-        completion: ((Bool) -> Void)? = nil
+        completion: (@Sendable (Bool) -> Void)? = nil
     ) {
         guard !isUnlocked else {
             completion?(true)
@@ -83,7 +83,7 @@ public final class BiometricPrivacyService: ObservableObject {
 
     private func startEvaluation(
         reason: String,
-        completion: ((Bool) -> Void)?
+        completion: (@Sendable (Bool) -> Void)?
     ) {
         guard !isUnlocked, !isAuthenticating else { return }
         guard WindowManager.shared.isExpanded, WindowManager.shared.currentTab == .notification else { return }

@@ -33,15 +33,19 @@ public final class CameraMirrorService: ObservableObject {
         isMirrorActive = true
         WindowManager.shared.updateHeightForCurrentTab()
 
-        // Request access if not yet determined, and start the session immediately
-        if AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
-            AVCaptureDevice.requestAccess(for: .video) { [weak self] _ in
-                Task { @MainActor in
-                    self?.startSessionOnQueue()
+        // Request access if not yet determined, and start the session once authorized
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        if status == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                if granted {
+                    Task { @MainActor in
+                        self?.startSessionOnQueue()
+                    }
                 }
             }
+        } else if status == .authorized {
+            startSessionOnQueue()
         }
-        startSessionOnQueue()
     }
 
     /// Stops the camera session immediately so the hardware indicator light turns off.

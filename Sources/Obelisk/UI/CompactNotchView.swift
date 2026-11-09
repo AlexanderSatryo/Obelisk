@@ -402,7 +402,7 @@ public struct CompactTimerWithProgressBar: View {
 }
 
 public struct CompactTimerWidthKey: PreferenceKey {
-    public static var defaultValue: CGFloat = 22.0
+    public static let defaultValue: CGFloat = 22.0
     public static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }

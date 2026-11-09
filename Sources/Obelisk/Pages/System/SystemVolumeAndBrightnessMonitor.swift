@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import CoreAudio
 import AudioToolbox
 import CoreGraphics
@@ -6,6 +7,7 @@ import CoreGraphics
 /// Monitors macOS system output volume, mute state, and built-in display brightness.
 /// Dispatches transient HUD bars on the notch (both in standby and extended mode)
 /// whenever the user adjusts volume or brightness (+ / -).
+@MainActor
 public final class SystemVolumeAndBrightnessMonitor {
     public static let shared = SystemVolumeAndBrightnessMonitor()
 
@@ -16,6 +18,10 @@ public final class SystemVolumeAndBrightnessMonitor {
     private var isInitialized: Bool = false
     private var pollTimer: Timer?
 
+    private var activeDeviceID: AudioDeviceID? = nil
+    private var deviceListenerBlock: AudioObjectPropertyListenerBlock? = nil
+    private var defaultDeviceListenerBlock: AudioObjectPropertyListenerBlock? = nil
+
     private typealias DisplayServicesGetBrightnessFunc = @convention(c) (CGDirectDisplayID, UnsafeMutablePointer<Float>) -> Int32
     private var getBrightnessFn: DisplayServicesGetBrightnessFunc?
 
@@ -25,10 +31,21 @@ public final class SystemVolumeAndBrightnessMonitor {
                 self.getBrightnessFn = unsafeBitCast(sym, to: DisplayServicesGetBrightnessFunc.self)
             }
         }
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.stopMonitoring()
+            }
+        }
     }
 
     /// Begins monitoring volume and display brightness changes.
     public func startMonitoring() {
+        guard !isInitialized else { return }
         let (vol, mute) = readCurrentAudioState()
         self.lastVolume = vol
         self.lastMute = mute
@@ -39,50 +56,115 @@ public final class SystemVolumeAndBrightnessMonitor {
         startPolling()
     }
 
-    private func setupAudioListener() {
-        let devID = defaultOutputDeviceID()
-        guard devID != 0 else { return }
+    /// Stops monitoring and unhooks all CoreAudio property listeners and runloop timers.
+    public func stopMonitoring() {
+        pollTimer?.invalidate()
+        pollTimer = nil
 
+        removeDeviceListener()
+        removeDefaultDeviceListener()
+
+        isInitialized = false
+    }
+
+    private func removeDeviceListener() {
+        guard let devID = activeDeviceID, let block = deviceListenerBlock else { return }
         var volAddr = AudioObjectPropertyAddress(
             mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
             mScope: kAudioObjectPropertyScopeOutput,
             mElement: kAudioObjectPropertyElementMain
         )
-        _ = AudioObjectAddPropertyListenerBlock(devID, &volAddr, DispatchQueue.main) { [weak self] _, _ in
-            self?.checkHardwareChanges()
-        }
+        AudioObjectRemovePropertyListenerBlock(devID, &volAddr, DispatchQueue.main, block)
 
         var scalarAddr = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyVolumeScalar,
             mScope: kAudioObjectPropertyScopeOutput,
             mElement: kAudioObjectPropertyElementMain
         )
-        _ = AudioObjectAddPropertyListenerBlock(devID, &scalarAddr, DispatchQueue.main) { [weak self] _, _ in
-            self?.checkHardwareChanges()
-        }
+        AudioObjectRemovePropertyListenerBlock(devID, &scalarAddr, DispatchQueue.main, block)
 
         var muteAddr = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyMute,
             mScope: kAudioObjectPropertyScopeOutput,
             mElement: kAudioObjectPropertyElementMain
         )
-        _ = AudioObjectAddPropertyListenerBlock(devID, &muteAddr, DispatchQueue.main) { [weak self] _, _ in
-            self?.checkHardwareChanges()
-        }
+        AudioObjectRemovePropertyListenerBlock(devID, &muteAddr, DispatchQueue.main, block)
 
-        // Listen for default output device changes (e.g. plugging in headphones or connecting AirPods)
+        self.activeDeviceID = nil
+        self.deviceListenerBlock = nil
+    }
+
+    private func removeDefaultDeviceListener() {
+        guard let block = defaultDeviceListenerBlock else { return }
         var defaultDevAddr = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        _ = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &defaultDevAddr, DispatchQueue.main) { [weak self] _, _ in
-            guard let self = self else { return }
-            self.setupAudioListener()
-            let (newVol, newMute) = self.readCurrentAudioState()
-            self.lastVolume = newVol
-            self.lastMute = newMute
-            self.lastDeviceSwitchTime = Date()
+        AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &defaultDevAddr, DispatchQueue.main, block)
+        self.defaultDeviceListenerBlock = nil
+    }
+
+    private func setupAudioListener() {
+        let devID = defaultOutputDeviceID()
+        guard devID != 0 else { return }
+
+        // Remove listener from previous device if switched
+        if activeDeviceID != devID {
+            removeDeviceListener()
+        }
+
+        if deviceListenerBlock == nil {
+            let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                Task { @MainActor in
+                    self?.checkHardwareChanges()
+                }
+            }
+            self.deviceListenerBlock = listener
+
+            var volAddr = AudioObjectPropertyAddress(
+                mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
+                mScope: kAudioObjectPropertyScopeOutput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            _ = AudioObjectAddPropertyListenerBlock(devID, &volAddr, DispatchQueue.main, listener)
+
+            var scalarAddr = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyVolumeScalar,
+                mScope: kAudioObjectPropertyScopeOutput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            _ = AudioObjectAddPropertyListenerBlock(devID, &scalarAddr, DispatchQueue.main, listener)
+
+            var muteAddr = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyMute,
+                mScope: kAudioObjectPropertyScopeOutput,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            _ = AudioObjectAddPropertyListenerBlock(devID, &muteAddr, DispatchQueue.main, listener)
+
+            self.activeDeviceID = devID
+        }
+
+        // Listen for default output device changes once (e.g. plugging in headphones or connecting AirPods)
+        if defaultDeviceListenerBlock == nil {
+            var defaultDevAddr = AudioObjectPropertyAddress(
+                mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            let defListener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    self.setupAudioListener()
+                    let (newVol, newMute) = self.readCurrentAudioState()
+                    self.lastVolume = newVol
+                    self.lastMute = newMute
+                    self.lastDeviceSwitchTime = Date()
+                }
+            }
+            _ = AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &defaultDevAddr, DispatchQueue.main, defListener)
+            self.defaultDeviceListenerBlock = defListener
         }
     }
 
@@ -90,7 +172,9 @@ public final class SystemVolumeAndBrightnessMonitor {
         pollTimer?.invalidate()
         // Fast 35ms polling interval (approx. 30 FPS) for buttery smooth brightness and audio tracking
         let timer = Timer(timeInterval: 0.035, repeats: true) { [weak self] _ in
-            self?.checkHardwareChanges()
+            MainActor.assumeIsolated {
+                self?.checkHardwareChanges()
+            }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.pollTimer = timer
@@ -109,30 +193,26 @@ public final class SystemVolumeAndBrightnessMonitor {
             self.lastVolume = vol
             self.lastMute = mute
 
-            Task { @MainActor in
-                let timeSinceDeviceSwitch = Date().timeIntervalSince(self.lastDeviceSwitchTime)
-                let isRecentDeviceSwitch = timeSinceDeviceSwitch >= 0 && timeSinceDeviceSwitch < 3.5
+            let timeSinceDeviceSwitch = Date().timeIntervalSince(self.lastDeviceSwitchTime)
+            let isRecentDeviceSwitch = timeSinceDeviceSwitch >= 0 && timeSinceDeviceSwitch < 3.5
 
-                let timeSinceBTAnnounce = Date().timeIntervalSince(AudioPeripheralsService.shared.lastAnnouncedTime)
-                let isRecentBTAnnounce = timeSinceBTAnnounce >= 0 && timeSinceBTAnnounce < 3.5
+            let timeSinceBTAnnounce = Date().timeIntervalSince(AudioPeripheralsService.shared.lastAnnouncedTime)
+            let isRecentBTAnnounce = timeSinceBTAnnounce >= 0 && timeSinceBTAnnounce < 3.5
 
-                let isDeviceHUDActive: Bool = {
-                    if let hud = HardwareTelemetryService.shared.activeTransientHUD {
-                        switch hud {
-                        case .deviceConnected, .deviceDisconnected:
-                            return true
-                        default:
-                            return false
-                        }
+            let isDeviceHUDActive: Bool = {
+                if let hud = HardwareTelemetryService.shared.activeTransientHUD {
+                    switch hud {
+                    case .deviceConnected, .deviceDisconnected:
+                        return true
+                    default:
+                        return false
                     }
-                    return false
-                }()
-
-                // Suppress volume HUD during device connection transitions so it does not overwrite the earbuds notification
-                guard !isRecentDeviceSwitch && !isRecentBTAnnounce && !isDeviceHUDActive else {
-                    return
                 }
+                return false
+            }()
 
+            // Suppress volume HUD during device connection transitions so it does not overwrite the earbuds notification
+            if !isRecentDeviceSwitch && !isRecentBTAnnounce && !isDeviceHUDActive {
                 HardwareTelemetryService.shared.triggerTransientHUD(
                     .volume(level: Double(vol), isMuted: mute),
                     duration: 1.8
@@ -147,23 +227,19 @@ public final class SystemVolumeAndBrightnessMonitor {
             if brightDiff > 0.005 {
                 self.lastBrightness = brightness
 
-                Task { @MainActor in
-                    // If charger was recently connected or disconnected, or any battery HUD is active, ignore brightness auto-ramp
-                    let timeSincePlug = Date().timeIntervalSince(HardwareTelemetryService.shared.lastChargerConnectionTime)
-                    let timeSinceUnplug = Date().timeIntervalSince(HardwareTelemetryService.shared.lastChargerDisconnectionTime)
-                    let isRecentPowerTransition = (timeSincePlug >= 0 && timeSincePlug < 3.5) || (timeSinceUnplug >= 0 && timeSinceUnplug < 3.5)
-                    let isBatteryHUDActive: Bool = {
-                        if let hud = HardwareTelemetryService.shared.activeTransientHUD,
-                           case .battery = hud {
-                            return true
-                        }
-                        return false
-                    }()
-
-                    guard !isRecentPowerTransition && !isBatteryHUDActive else {
-                        return
+                // If charger was recently connected or disconnected, or any battery HUD is active, ignore brightness auto-ramp
+                let timeSincePlug = Date().timeIntervalSince(HardwareTelemetryService.shared.lastChargerConnectionTime)
+                let timeSinceUnplug = Date().timeIntervalSince(HardwareTelemetryService.shared.lastChargerDisconnectionTime)
+                let isRecentPowerTransition = (timeSincePlug >= 0 && timeSincePlug < 3.5) || (timeSinceUnplug >= 0 && timeSinceUnplug < 3.5)
+                let isBatteryHUDActive: Bool = {
+                    if let hud = HardwareTelemetryService.shared.activeTransientHUD,
+                       case .battery = hud {
+                        return true
                     }
+                    return false
+                }()
 
+                if !isRecentPowerTransition && !isBatteryHUDActive {
                     HardwareTelemetryService.shared.triggerTransientHUD(
                         .brightness(level: Double(brightness)),
                         duration: 1.8

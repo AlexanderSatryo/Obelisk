@@ -1,5 +1,6 @@
 import AppKit
 
+@MainActor
 public struct ScreenGeometry {
     public static var currentScreen: NSScreen? {
         if let notched = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) {

@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// Navigation categories displayed in the preferences sidebar.
-public enum SettingsCategory: String, CaseIterable, Identifiable {
+public enum SettingsCategory: String, CaseIterable, Identifiable, Sendable {
     case appearance = "Appearance"
     case behavior = "Behavior"
     case modules = "Modules"
@@ -78,7 +78,7 @@ public enum SettingsCategory: String, CaseIterable, Identifiable {
 }
 
 /// Structured search index item with multi-keyword mapping in English
-public struct SettingsSearchItem: Identifiable {
+public struct SettingsSearchItem: Identifiable, Sendable {
     public let id: String
     public let title: String
     public let category: SettingsCategory

@@ -32,18 +32,33 @@ public final class DownloadMonitorService: ObservableObject {
 
     private init() {
         startMonitoring()
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.stopMonitoring()
+            }
+        }
     }
 
     public func startMonitoring() {
         pollTimer?.invalidate()
         let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 self?.scanDownloadsFolder()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.pollTimer = timer
         scanDownloadsFolder()
+    }
+
+    public func stopMonitoring() {
+        pollTimer?.invalidate()
+        pollTimer = nil
     }
 
     private func scanDownloadsFolder() {

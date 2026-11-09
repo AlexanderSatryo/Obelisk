@@ -96,16 +96,16 @@ public final class MediaManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notif in
-            Task { @MainActor in
-                self?.handleApplicationActivated(notif)
+            guard let app = notif.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            let name = (app.localizedName ?? "").lowercased()
+            let bundle = (app.bundleIdentifier ?? "").lowercased()
+            MainActor.assumeIsolated {
+                self?.handleApplicationActivated(name: name, bundle: bundle)
             }
         }
     }
 
-    private func handleApplicationActivated(_ notif: Notification) {
-        guard let app = notif.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
-        let name = (app.localizedName ?? "").lowercased()
-        let bundle = (app.bundleIdentifier ?? "").lowercased()
+    private func handleApplicationActivated(name: String, bundle: String) {
 
         if name.contains("vidio") || bundle.contains("vidio") {
             preferredSourceOverride = .vidio

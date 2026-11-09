@@ -16,6 +16,26 @@ public struct TrayFile: Identifiable, Equatable {
     }
 }
 
+/// Thread-safe collector for incoming dropped URLs across concurrent asynchronous item provider calls.
+public final class URLDropCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var urls: [URL] = []
+
+    public init() {}
+
+    public func append(_ url: URL) {
+        lock.lock()
+        urls.append(url)
+        lock.unlock()
+    }
+
+    public func collect() -> [URL] {
+        lock.lock()
+        defer { lock.unlock() }
+        return urls
+    }
+}
+
 /// Receives completion callbacks from the system AirDrop sharing service.
 private final class AirDropSharingDelegate: NSObject, NSSharingServiceDelegate {
     var onDidShare: (() -> Void)?

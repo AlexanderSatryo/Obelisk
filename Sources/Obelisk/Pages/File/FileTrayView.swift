@@ -194,8 +194,7 @@ public struct FileTrayView: View {
     // MARK: - Drop Helpers
 
     private func loadURLs(from providers: [NSItemProvider], completion: @escaping @MainActor ([URL]) -> Void) -> Bool {
-        let lock = NSLock()
-        var found: [URL] = []
+        let collector = URLDropCollector()
         let group = DispatchGroup()
 
         for provider in providers where provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
@@ -209,17 +208,15 @@ public struct FileTrayView: View {
                     resolved = url
                 }
                 if let resolved {
-                    lock.lock()
-                    found.append(resolved)
-                    lock.unlock()
+                    collector.append(resolved)
                 }
             }
         }
 
         group.notify(queue: .main) {
-            guard !found.isEmpty else { return }
-            let urls = found
-            Task { @MainActor in completion(urls) }
+            let urls = collector.collect()
+            guard !urls.isEmpty else { return }
+            completion(urls)
         }
         return true
     }

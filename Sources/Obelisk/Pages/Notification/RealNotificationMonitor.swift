@@ -45,7 +45,17 @@ public final class RealNotificationMonitor: ObservableObject {
 
     private var whatsAppSnapshots: [WhatsAppSnapshot] = []
 
-    private init() {}
+    private init() {
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.stopMonitoring()
+            }
+        }
+    }
 
     /// Starts the Accessibility banner poller, WhatsApp state tracker, and real-time `usernoted` log stream monitor.
     public func startMonitoring() {
@@ -91,7 +101,8 @@ public final class RealNotificationMonitor: ObservableObject {
 
     /// Prompts macOS to grant Accessibility permission to Obelisk so banner message bodies can be read.
     public func requestAccessibilityPermission() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let promptKey = "AXTrustedCheckOptionPrompt" as CFString
+        let options = [promptKey: true] as CFDictionary
         isAccessibilityTrusted = AXIsProcessTrustedWithOptions(options)
     }
 

@@ -19,6 +19,16 @@ public final class CapsLockMonitorService: ObservableObject {
         let initial = CGEventSource.flagsState(.hidSystemState).contains(.maskAlphaShift)
             || NSEvent.modifierFlags.contains(.capsLock)
         self.isCapsLockOn = initial
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.stopMonitoring()
+            }
+        }
     }
 
     /// Starts real-time monitoring of Caps Lock state transitions.
@@ -38,22 +48,41 @@ public final class CapsLockMonitorService: ObservableObject {
         }
 
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 self?.handleFlagsChanged(event.modifierFlags.contains(.capsLock))
             }
             return event
         }
 
-        // 2. High-speed Quartz HID polling (approx. 30 FPS / 35ms)
+        // 2. High-speed Quartz HID fallback polling (100ms / 10 FPS)
         // Requires ZERO permissions, works 100% reliably in background, sandbox, or without Accessibility!
-        let timer = Timer(timeInterval: 0.035, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self = self else { return }
                 let state = CGEventSource.flagsState(.hidSystemState).contains(.maskAlphaShift)
-                self?.handleFlagsChanged(state)
+                if state != self.isCapsLockOn {
+                    self.handleFlagsChanged(state)
+                }
             }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.pollTimer = timer
+    }
+
+    /// Stops monitoring and unregisters all event monitors and timers.
+    public func stopMonitoring() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+
+        if let g = globalMonitor {
+            NSEvent.removeMonitor(g)
+            globalMonitor = nil
+        }
+        if let l = localMonitor {
+            NSEvent.removeMonitor(l)
+            localMonitor = nil
+        }
+        isInitialized = false
     }
 
     private func handleFlagsChanged(_ newState: Bool) {
