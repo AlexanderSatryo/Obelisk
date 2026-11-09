@@ -502,6 +502,7 @@ public final class RealNotificationMonitor: ObservableObject {
         let isSentByMe: Bool
         let matchesCurrentMinute: Bool
         let rawState: String
+        let groupName: String?
     }
 
     private func captureWhatsAppSnapshot() {
@@ -569,7 +570,8 @@ public final class RealNotificationMonitor: ObservableObject {
                 appName: "WhatsApp",
                 bundleIdentifier: "net.whatsapp.WhatsApp",
                 sender: winner.sender,
-                message: winner.message
+                message: winner.message,
+                groupName: winner.groupName
             )
         } else {
             pending.postedToService = true
@@ -580,7 +582,8 @@ public final class RealNotificationMonitor: ObservableObject {
                 bundleIdentifier: "net.whatsapp.WhatsApp",
                 sender: winner.sender,
                 message: winner.message,
-                timestamp: pending.timestamp
+                timestamp: pending.timestamp,
+                groupName: winner.groupName
             )
             NotificationService.shared.postNotification(notification)
         }
@@ -737,6 +740,7 @@ public final class RealNotificationMonitor: ObservableObject {
         }
 
         var sender = chatTitle
+        var groupName: String? = nil
         if body.lowercased().hasPrefix("message, ") {
             body = String(body.dropFirst("message, ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
         } else if body.hasPrefix("Message from ") {
@@ -745,7 +749,8 @@ public final class RealNotificationMonitor: ObservableObject {
                 let groupSender = ObeliskNotification.stripBidiControlMarks(String(rest[..<commaIdx]))
                 let msgPart = ObeliskNotification.stripBidiControlMarks(String(rest[rest.index(after: commaIdx)...]))
                 if !groupSender.isEmpty {
-                    sender = "\(groupSender) (\(chatTitle))"
+                    sender = groupSender
+                    groupName = chatTitle
                 }
                 body = msgPart
             }
@@ -760,7 +765,8 @@ public final class RealNotificationMonitor: ObservableObject {
             isPinned: isPinned,
             isSentByMe: isSentByMe,
             matchesCurrentMinute: matchesCurrentMinute,
-            rawState: "\(d)|\(v)"
+            rawState: "\(d)|\(v)",
+            groupName: groupName
         )
     }
 

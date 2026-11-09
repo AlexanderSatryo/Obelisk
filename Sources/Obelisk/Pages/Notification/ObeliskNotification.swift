@@ -11,9 +11,10 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
     public let timestamp: Date
     public let appIcon: NSImage?
     public let appURL: URL?
+    public let groupName: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, appName, bundleIdentifier, sender, message, timestamp
+        case id, appName, bundleIdentifier, sender, message, timestamp, groupName
     }
 
     public init(
@@ -24,11 +25,13 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         message: String,
         timestamp: Date = Date(),
         appIcon: NSImage? = nil,
-        appURL: URL? = nil
+        appURL: URL? = nil,
+        groupName: String? = nil
     ) {
         let cleanAppName = ObeliskNotification.stripBidiControlMarks(appName)
         let cleanSender = ObeliskNotification.stripBidiControlMarks(sender)
         let cleanMessage = ObeliskNotification.stripBidiControlMarks(message)
+        let cleanGroup = groupName.map { ObeliskNotification.stripBidiControlMarks($0) }
 
         self.id = id
         self.appName = cleanAppName
@@ -36,6 +39,7 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         self.sender = cleanSender
         self.message = cleanMessage
         self.timestamp = timestamp
+        self.groupName = (cleanGroup?.isEmpty == true) ? nil : cleanGroup
 
         let resolvedURL = appURL ?? ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: cleanAppName)
         self.appURL = resolvedURL
@@ -50,11 +54,13 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         let rawSender = try container.decode(String.self, forKey: .sender)
         let rawMessage = try container.decode(String.self, forKey: .message)
         self.timestamp = try container.decode(Date.self, forKey: .timestamp)
+        let rawGroupName = try container.decodeIfPresent(String.self, forKey: .groupName)
 
         let cleanAppName = ObeliskNotification.stripBidiControlMarks(rawAppName)
         self.appName = cleanAppName
         self.sender = ObeliskNotification.stripBidiControlMarks(rawSender)
         self.message = ObeliskNotification.stripBidiControlMarks(rawMessage)
+        self.groupName = rawGroupName.map { ObeliskNotification.stripBidiControlMarks($0) }
 
         let resolvedURL = ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: cleanAppName)
         self.appURL = resolvedURL
@@ -79,6 +85,37 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         try container.encode(sender, forKey: .sender)
         try container.encode(message, forKey: .message)
         try container.encode(timestamp, forKey: .timestamp)
+        try container.encodeIfPresent(groupName, forKey: .groupName)
+    }
+
+    /// Returns the group name (if this is a group chat notification), or nil if it's a 1-on-1 direct message.
+    public var resolvedGroupName: String? {
+        if let g = groupName, !g.isEmpty {
+            return g
+        }
+        // Fallback for notifications stored as "Sender (Group Name)"
+        if let openParen = sender.firstIndex(of: "("), sender.hasSuffix(")") {
+            let candidateGroup = String(sender[sender.index(after: openParen)..<sender.index(before: sender.endIndex)]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !candidateGroup.isEmpty {
+                return candidateGroup
+            }
+        }
+        return nil
+    }
+
+    /// Returns the individual sender name (e.g. "Alex" or "Alpin Pasuruan").
+    public var resolvedSenderName: String {
+        if let _ = groupName, !sender.isEmpty {
+            return sender
+        }
+        // Fallback for notifications stored as "Sender (Group Name)"
+        if let openParen = sender.firstIndex(of: "("), sender.hasSuffix(")") {
+            let candidateSender = String(sender[..<openParen]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !candidateSender.isEmpty {
+                return candidateSender
+            }
+        }
+        return sender
     }
 
     public var formattedTimeAgo: String {
@@ -103,7 +140,8 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         lhs.appName == rhs.appName &&
         lhs.bundleIdentifier == rhs.bundleIdentifier &&
         lhs.sender == rhs.sender &&
-        lhs.message == rhs.message
+        lhs.message == rhs.message &&
+        lhs.groupName == rhs.groupName
     }
 
     /// Resolves the filesystem URL of the target application on macOS.

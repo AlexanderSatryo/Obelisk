@@ -81,8 +81,8 @@ public final class NotificationService: ObservableObject {
         scheduleAutoDismiss(seconds: timeout)
     }
 
-    /// Updates the sender and message of an existing notification when rich banner text arrives shortly after push delivery.
-    public func enrichNotification(id: UUID, appName: String? = nil, bundleIdentifier: String? = nil, sender: String, message: String) {
+    /// Updates the sender, group, and message of an existing notification when rich banner text arrives shortly after push delivery.
+    public func enrichNotification(id: UUID, appName: String? = nil, bundleIdentifier: String? = nil, sender: String, message: String, groupName: String? = nil) {
         if let idx = recentNotifications.firstIndex(where: { $0.id == id }) {
             let old = recentNotifications[idx]
             let updated = ObeliskNotification(
@@ -93,7 +93,8 @@ public final class NotificationService: ObservableObject {
                 message: message,
                 timestamp: old.timestamp,
                 appIcon: old.appIcon,
-                appURL: old.appURL
+                appURL: old.appURL,
+                groupName: groupName ?? old.groupName
             )
             recentNotifications[idx] = updated
             if activeNotification?.id == id {

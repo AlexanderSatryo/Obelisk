@@ -196,24 +196,59 @@ public struct NotificationHistoryView: View {
                     Spacer()
                 }
 
-                // Group / Sender Name: spans full horizontal width first, then wraps below cleanly
-                if !item.sender.isEmpty && item.sender != item.appName {
+                // Notification Content
+                if let group = item.resolvedGroupName {
+                    // Group Chat Layout:
+                    // Line 1: GRUP (spans full width horizontally, wraps below cleanly if long)
+                    Text(group)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // Line 2: Sender: Chat message (e.g. "Alex: ini template nya")
+                    if !item.message.isEmpty {
+                        (
+                            Text(!item.resolvedSenderName.isEmpty ? "\(item.resolvedSenderName): " : "")
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.92))
+                            +
+                            Text(item.message)
+                                .font(.system(size: 10.5, weight: .regular))
+                                .foregroundColor(.white.opacity(0.75))
+                        )
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else if !item.sender.isEmpty && item.sender != item.appName {
+                    // Direct 1-on-1 Chat
                     Text(item.sender)
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                }
 
-                // Chat Message Body: placed directly underneath
-                if !item.message.isEmpty {
-                    Text(item.message)
-                        .font(.system(size: 10.5, weight: .regular))
-                        .foregroundColor(.white.opacity(0.75))
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if !item.message.isEmpty {
+                        Text(item.message)
+                            .font(.system(size: 10.5, weight: .regular))
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                } else {
+                    // Generic App Notification
+                    if !item.message.isEmpty {
+                        Text(item.message)
+                            .font(.system(size: 10.5, weight: .regular))
+                            .foregroundColor(.white.opacity(0.85))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
 
