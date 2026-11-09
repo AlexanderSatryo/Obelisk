@@ -134,7 +134,7 @@ public struct NotchTransientHUDBar: View {
                 .font(.system(size: 20, weight: .regular))
                 .foregroundColor(.white.opacity(0.4))
         case .download(_, let statusText, let isSuccess, let progress):
-            if let frac = progress {
+            if let frac = progress, statusText != "Download Complete" && statusText != "Download Failed" {
                 HStack(spacing: 6) {
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.white.opacity(0.20))
@@ -156,12 +156,9 @@ public struct NotchTransientHUDBar: View {
                         .foregroundColor(isSuccess ? .white : .white.opacity(0.75))
                 }
             } else {
-                HStack(spacing: 6) {
-                    IndeterminateProgressBar(width: 56, height: 4)
-                    Text(statusText)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
-                }
+                Text(statusText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
             }
         case .battery(let pct, let isCharging, let statusText):
             if statusText == "Fully Charged" || statusText.contains("Fully Charged") {
@@ -556,7 +553,7 @@ public struct NotchTransientHUDBar: View {
             }
 
         case .download(_, let statusText, let isSuccess, let progress):
-            if let frac = progress {
+            if let frac = progress, statusText != "Download Complete" && statusText != "Download Failed" {
                 HStack(spacing: 6) {
                     ZStack(alignment: .leading) {
                         Capsule()
@@ -580,15 +577,10 @@ public struct NotchTransientHUDBar: View {
                     .foregroundColor(isSuccess ? calmSageGreen : calmWarmAmber)
                     .lineLimit(1)
             } else {
-                HStack(spacing: 6) {
-                    IndeterminateProgressBar(width: 48, height: 4)
-
-                    Text(statusText)
-                        .font(.system(size: 11, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                }
+                Text(statusText)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
             }
         }
     }

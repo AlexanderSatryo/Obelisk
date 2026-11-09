@@ -148,22 +148,23 @@ public final class WindowManager: ObservableObject {
             let stWidth = ceil((st as NSString).size(withAttributes: [.font: font]).width)
             rightContentWidth = stWidth
         } else {
-            let txt = statusText ?? (progress != nil ? "\(Int(round(progress! * 100)))%" : "100 MB")
+            let frac = progress ?? 0.0
+            let txt = "\(Int(round(frac * 100)))%"
             let txtWidth = ceil((txt as NSString).size(withAttributes: [.font: font]).width)
-            // progress bar (48pt) + spacing (6pt) + size/percent text
+            // progress bar (48pt) + spacing (6pt) + percent text
             rightContentWidth = 48 + 6 + txtWidth
         }
 
         // Symmetrical margin on both sides of content:
-        // Ensures content sits comfortably centered between outer edge and physical bezel with at least 24pt margin.
-        let sideMargin: CGFloat = 24
+        // Ensures content sits comfortably centered between outer edge and physical bezel.
+        let sideMargin: CGFloat = 18
         let leftWingNeeded = leftContentWidth + (sideMargin * 2)
         let rightWingNeeded = rightContentWidth + (sideMargin * 2)
 
         // Symmetrical balance: both wings match the larger required width
         let desiredWing = max(leftWingNeeded, rightWingNeeded)
-        // Clamp: min 120 pt, max 265 pt (safe margin against macOS menu bar items)
-        return min(max(desiredWing, 120), 265)
+        // Clamp: min 120 pt, max 152 pt so wings never collide with right-side menu bar widgets (e.g. CPU stats)
+        return min(max(desiredWing, 120), 152)
     }
 
     /// Dynamically computes the balanced wing width for battery transient HUD notifications (including Unplug Charger / Fully Charged),
@@ -310,8 +311,7 @@ public final class WindowManager: ObservableObject {
                 shouldWiden = hasDownload || (!bothHidden && (hasTrack || leftAlways || rightAlways))
             }
             if hasDownload, let first = DownloadMonitorService.shared.activeDownloads.first {
-                let statusText = first.progressFraction != nil ? nil : DownloadMonitorService.formatFileSize(first.currentBytes)
-                let wingW = computeDownloadWingWidth(fileName: first.displayName, statusText: statusText, progress: first.progressFraction)
+                let wingW = computeDownloadWingWidth(fileName: first.displayName, statusText: nil, progress: first.progressFraction)
                 targetWidth = baseWidth + (wingW * 2)
             } else {
                 targetWidth = shouldWiden ? (baseWidth + CGFloat(settings.compactWidthOffset)) : baseWidth

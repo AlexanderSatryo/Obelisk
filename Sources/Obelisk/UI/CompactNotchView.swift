@@ -146,6 +146,7 @@ public struct CompactNotchView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+            .frame(maxWidth: max(60, wingWidth - 20))
         } else {
             standardLeftWingContent
         }
@@ -239,32 +240,24 @@ public struct CompactNotchView: View {
     @ViewBuilder
     private var rightWingView: some View {
         if settings.showDownloadsOnStandby, let activeDownload = downloadService.activeDownloads.first {
+            let frac = activeDownload.progressFraction ?? 0.0
             HStack(spacing: 6) {
-                if let frac = activeDownload.progressFraction {
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.20))
-                        Capsule()
-                            .fill(Color.white)
-                            .frame(width: max(4, min(48, 48 * CGFloat(frac))))
-                            .animation(.linear(duration: 0.3), value: frac)
-                    }
-                    .frame(width: 48, height: 4)
-
-                    Text("\(Int(round(frac * 100)))%")
-                        .font(.system(size: 11, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                } else {
-                    IndeterminateProgressBar(width: 48, height: 4)
-
-                    Text(DownloadMonitorService.formatFileSize(activeDownload.currentBytes))
-                        .font(.system(size: 11, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.22))
+                        .frame(width: 48, height: 4)
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(width: max(4, min(48, 48 * CGFloat(frac))), height: 4)
+                        .animation(.easeOut(duration: 0.28), value: frac)
                 }
+                .frame(width: 48, height: 4)
+
+                Text("\(Int(round(frac * 100)))%")
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundColor(.white)
+                    .lineLimit(1)
             }
         } else {
             standardRightWingContent
