@@ -49,6 +49,10 @@ public final class NotificationService: ObservableObject {
     public func postNotification(_ notification: ObeliskNotification) {
         guard ObeliskSettings.shared.enableNotifications else { return }
 
+        // Immediately dismiss any active transient volume/brightness HUD so the incoming notification
+        // appears in the standby notch instantly without waiting for the volume notification to finish
+        HardwareTelemetryService.shared.dismissTransientHUD(animated: false)
+
         autoDismissWorkItem?.cancel()
         autoDismissWorkItem = nil
 

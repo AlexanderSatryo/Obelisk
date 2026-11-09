@@ -5,7 +5,7 @@ import Darwin
 import IOKit.ps
 
 /// Represents a transient Dynamic Island HUD notification displayed briefly when the notch is collapsed or expanded.
-public enum NotchTransientHUD: Equatable {
+public enum NotchTransientHUD: Equatable, Hashable {
     case deviceConnected(name: String, iconName: String, statusText: String)
     case deviceDisconnected(name: String, iconName: String, statusText: String)
     case battery(percentage: Int, isCharging: Bool, statusText: String)
@@ -104,6 +104,29 @@ public final class HardwareTelemetryService: ObservableObject {
         }
         hudDismissWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+    }
+
+    /// Dismisses any active transient HUD immediately and cancels pending dismiss timers.
+    public func dismissTransientHUD(animated: Bool = true) {
+        hudDismissWorkItem?.cancel()
+        hudDismissWorkItem = nil
+
+        guard activeTransientHUD != nil else { return }
+
+        let update = {
+            self.activeTransientHUD = nil
+            if !WindowManager.shared.isExpanded {
+                WindowManager.shared.updateCompactWidth(animated: false)
+            }
+        }
+
+        if animated {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                update()
+            }
+        } else {
+            update()
+        }
     }
 
     private func startTelemetryTimer() {

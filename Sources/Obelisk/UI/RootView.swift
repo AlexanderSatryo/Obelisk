@@ -8,6 +8,7 @@ public struct RootView: View {
     @ObservedObject var settings: ObeliskSettings = .shared
     @ObservedObject var mediaManager: MediaManager = .shared
     @ObservedObject var notificationService: NotificationService = .shared
+    @ObservedObject var telemetry: HardwareTelemetryService = .shared
 
     private var showsExpanded: Bool {
         windowManager.isExpanded
@@ -26,7 +27,7 @@ public struct RootView: View {
             return true
         }
         guard !windowManager.isExpanded,
-              let hud = HardwareTelemetryService.shared.activeTransientHUD else { return false }
+              let hud = telemetry.activeTransientHUD else { return false }
         switch hud {
         case .volume, .brightness, .battery, .deviceConnected, .deviceDisconnected:
             return true
@@ -111,10 +112,16 @@ public struct RootView: View {
                         )
 
                     // Transient HUD (earbuds, charging) rendered inside the top notch body
-                    if let hud = HardwareTelemetryService.shared.activeTransientHUD {
+                    if let hud = telemetry.activeTransientHUD {
                         NotchTransientHUDBar(hud: hud, isExpanded: true)
+                            .id(hud)
                             .transition(.opacity)
                     }
+                } else if let hud = telemetry.activeTransientHUD {
+                    // Transient HUD (volume, mute, brightness, earbuds, charging) when collapsed in standby
+                    NotchTransientHUDBar(hud: hud, isExpanded: false)
+                        .id(hud)
+                        .transition(.opacity)
                 } else if let notif = notificationService.activeNotification {
                     // Dynamic Island notification wings / unlocked card when collapsed
                     NotificationNotchView(notification: notif, windowManager: windowManager)
@@ -122,14 +129,8 @@ public struct RootView: View {
                 } else {
                     // Compact Wings (visible when collapsed and transient HUD is not active)
                     CompactNotchView(windowManager: windowManager)
-                        .opacity(HardwareTelemetryService.shared.activeTransientHUD != nil ? 0 : 1)
-                        .allowsHitTesting(HardwareTelemetryService.shared.activeTransientHUD == nil)
-
-                    // Transient HUD (earbuds, charging)
-                    if let hud = HardwareTelemetryService.shared.activeTransientHUD {
-                        NotchTransientHUDBar(hud: hud, isExpanded: false)
-                            .transition(.opacity)
-                    }
+                        .opacity(telemetry.activeTransientHUD != nil ? 0 : 1)
+                        .allowsHitTesting(telemetry.activeTransientHUD == nil)
                 }
             }
             .frame(width: currentWidth, height: currentHeight, alignment: .top)

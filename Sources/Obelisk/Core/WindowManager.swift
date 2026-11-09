@@ -144,12 +144,7 @@ public final class WindowManager: ObservableObject {
         let targetWidth: CGFloat
         let targetHeight: CGFloat
         let customBaseHeight = max(24, baseHeight + CGFloat(settings.compactHeightOffset))
-        if let _ = NotificationService.shared.activeNotification {
-            let notifExtra: CGFloat = 280
-            let extraWidth: CGFloat = max(CGFloat(settings.compactWidthOffset), notifExtra)
-            targetWidth = baseWidth + extraWidth
-            targetHeight = customBaseHeight
-        } else if let hud = HardwareTelemetryService.shared.activeTransientHUD {
+        if let hud = HardwareTelemetryService.shared.activeTransientHUD {
             let isBatteryHUD: Bool
             let isVolOrBright: Bool
             switch hud {
@@ -176,6 +171,11 @@ public final class WindowManager: ObservableObject {
                 targetWidth = baseWidth + extraWidth
                 targetHeight = customBaseHeight
             }
+        } else if let _ = NotificationService.shared.activeNotification {
+            let notifExtra: CGFloat = 280
+            let extraWidth: CGFloat = max(CGFloat(settings.compactWidthOffset), notifExtra)
+            targetWidth = baseWidth + extraWidth
+            targetHeight = customBaseHeight
         } else {
             let leftAlways = (settings.leftWingContent == .weatherMini || settings.leftWingContent == .batteryStatus || settings.leftWingContent == .cpuLoad)
             let rightAlways = (settings.rightWingStyle == .batteryOrPrivacy || settings.rightWingStyle == .systemTelemetry)
