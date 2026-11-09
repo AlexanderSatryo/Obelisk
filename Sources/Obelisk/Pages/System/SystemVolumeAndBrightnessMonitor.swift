@@ -119,18 +119,19 @@ public final class SystemVolumeAndBrightnessMonitor {
                 self.lastBrightness = brightness
 
                 Task { @MainActor in
-                    // If charger was recently connected or battery charging HUD is active, ignore brightness auto-ramp
+                    // If charger was recently connected or disconnected, or any battery HUD is active, ignore brightness auto-ramp
                     let timeSincePlug = Date().timeIntervalSince(HardwareTelemetryService.shared.lastChargerConnectionTime)
-                    let isRecentChargerPlug = timeSincePlug >= 0 && timeSincePlug < 3.5
-                    let isBatteryChargingHUDActive: Bool = {
+                    let timeSinceUnplug = Date().timeIntervalSince(HardwareTelemetryService.shared.lastChargerDisconnectionTime)
+                    let isRecentPowerTransition = (timeSincePlug >= 0 && timeSincePlug < 3.5) || (timeSinceUnplug >= 0 && timeSinceUnplug < 3.5)
+                    let isBatteryHUDActive: Bool = {
                         if let hud = HardwareTelemetryService.shared.activeTransientHUD,
-                           case .battery(_, let isCharging, _) = hud, isCharging {
+                           case .battery = hud {
                             return true
                         }
                         return false
                     }()
 
-                    guard !isRecentChargerPlug && !isBatteryChargingHUDActive else {
+                    guard !isRecentPowerTransition && !isBatteryHUDActive else {
                         return
                     }
 

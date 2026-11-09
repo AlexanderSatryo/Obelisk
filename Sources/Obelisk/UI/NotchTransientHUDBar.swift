@@ -73,7 +73,7 @@ public struct NotchTransientHUDBar: View {
             return name
         case .battery(let pct, let isCharging, let statusText):
             if isCharging { return "Charging" }
-            if statusText == "Disconnected" || statusText == "Unplugged" { return "Power Unplugged" }
+            if statusText == "Disconnected" || statusText == "Unplugged" { return "Power Disconnected" }
             return pct <= 20 ? "Low Battery" : "Battery"
         case .volume(_, let isMuted):
             return isMuted ? "Muted" : "Volume"
@@ -253,7 +253,7 @@ public struct NotchTransientHUDBar: View {
 
                 let title: String = {
                     if isCharging { return "Charging" }
-                    if statusText == "Disconnected" || statusText == "Unplugged" { return "Unplugged" }
+                    if statusText == "Disconnected" || statusText == "Unplugged" { return "Disconnected" }
                     return pct <= 20 ? "Low Battery" : "Battery"
                 }()
 

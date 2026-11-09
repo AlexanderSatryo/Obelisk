@@ -42,6 +42,7 @@ public final class HardwareTelemetryService: ObservableObject {
     @Published public var batteryHealthPercent: Int = 100
     @Published public var batteryCycleCount: Int = 0
     public var lastChargerConnectionTime: Date = .distantPast
+    public var lastChargerDisconnectionTime: Date = .distantPast
 
     // MARK: - Transient Compact Notch HUD State
     @Published public var activeTransientHUD: NotchTransientHUD? = nil
@@ -347,6 +348,7 @@ public final class HardwareTelemetryService: ObservableObject {
         if hasInitializedPowerState && !isInitial {
             if pluggedIn != previousPluggedIn || charging != previousCharging {
                 if previousPluggedIn && !pluggedIn {
+                    self.lastChargerDisconnectionTime = Date()
                     triggerTransientHUD(
                         .battery(
                             percentage: pct,
