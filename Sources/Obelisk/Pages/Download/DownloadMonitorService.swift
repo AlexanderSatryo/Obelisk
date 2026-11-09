@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Combine
+import Darwin
 
 public struct ActiveDownloadItem: Identifiable, Equatable {
     public let id: String
@@ -29,6 +30,8 @@ public final class DownloadMonitorService: ObservableObject {
     private var pollTimer: Timer?
     private var knownActiveURLs: Set<URL> = []
     private var previousByteCounts: [URL: (bytes: Int64, timestamp: Date)] = [:]
+    private var cachedTotalSizes: [URL: Int64] = [:]
+    private var pendingTotalSizeLookups: Set<URL> = []
 
     private init() {
         startMonitoring()
@@ -46,7 +49,7 @@ public final class DownloadMonitorService: ObservableObject {
 
     public func startMonitoring() {
         pollTimer?.invalidate()
-        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.scanDownloadsFolder()
             }
@@ -99,6 +102,11 @@ public final class DownloadMonitorService: ObservableObject {
                    let size = attrs[.size] as? Int64 {
                     currentBytes = size
                 }
+                if let cached = cachedTotalSizes[url] {
+                    totalBytes = cached
+                } else {
+                    requestTotalSizeIfAvailable(for: url)
+                }
             }
 
             // Calculate download speed
@@ -132,26 +140,39 @@ public final class DownloadMonitorService: ObservableObject {
             currentActive.append(item)
         }
 
-        // Detect finished downloads
-        for finishedURL in knownActiveURLs.subtracting(currentURLs) {
-            let finishedName = cleanDownloadName(for: finishedURL)
+        // Detect disappeared URLs
+        let disappearedURLs = knownActiveURLs.subtracting(currentURLs)
+        let appearedURLs = currentURLs.subtracting(knownActiveURLs)
+
+        var trulyFinishedURLs: [URL] = []
+        for disappeared in disappearedURLs {
+            let lower = disappeared.lastPathComponent.lowercased()
+            // In-flight rename by Chrome from Unconfirmed XXXXX.crdownload to actual filename.crdownload
+            if lower.hasPrefix("unconfirmed") && !appearedURLs.isEmpty {
+                if let newURL = appearedURLs.first {
+                    if let prev = previousByteCounts[disappeared] {
+                        previousByteCounts[newURL] = prev
+                    }
+                    if let cached = cachedTotalSizes[disappeared] {
+                        cachedTotalSizes[newURL] = cached
+                    }
+                }
+                previousByteCounts.removeValue(forKey: disappeared)
+                cachedTotalSizes.removeValue(forKey: disappeared)
+                pendingTotalSizeLookups.remove(disappeared)
+                continue
+            }
+            trulyFinishedURLs.append(disappeared)
+        }
+
+        // Process completed or cancelled downloads
+        for finishedURL in trulyFinishedURLs {
+            let lastSize = previousByteCounts[finishedURL]?.bytes ?? 0
             previousByteCounts.removeValue(forKey: finishedURL)
+            cachedTotalSizes.removeValue(forKey: finishedURL)
+            pendingTotalSizeLookups.remove(finishedURL)
 
-            // Check if final destination file exists (success) or was deleted/cancelled (failed)
-            let finalTargetURL = finishedURL.deletingPathExtension()
-            let finalExists = fileManager.fileExists(atPath: finalTargetURL.path)
-            let statusText = finalExists ? "Download Complete" : "Download Failed"
-
-            // Trigger elegant completion banner inside the notch
-            HardwareTelemetryService.shared.triggerTransientHUD(
-                .download(
-                    fileName: finishedName,
-                    statusText: statusText,
-                    isSuccess: finalExists,
-                    progress: nil
-                ),
-                duration: 3.5
-            )
+            resolveAndNotifyCompletion(finishedURL: finishedURL, lastKnownSize: lastSize)
         }
 
         let wasDownloading = self.isDownloading
@@ -175,6 +196,82 @@ public final class DownloadMonitorService: ObservableObject {
         }
     }
 
+    private func resolveAndNotifyCompletion(finishedURL: URL, lastKnownSize: Int64) {
+        let rawName = cleanDownloadName(for: finishedURL)
+
+        // Allow 350ms for atomic rename and macOS quarantine/Gatekeeper processing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard self != nil else { return }
+            guard let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first else { return }
+
+            let fileManager = FileManager.default
+            let finalTargetURL = finishedURL.deletingPathExtension()
+
+            var resolvedName = rawName
+            var isSuccess = false
+
+            // Check 1: Direct target file exists and was modified recently (within 15 seconds)
+            if fileManager.fileExists(atPath: finalTargetURL.path) {
+                if let modDate = (try? fileManager.attributesOfItem(atPath: finalTargetURL.path))?[.modificationDate] as? Date,
+                   modDate.timeIntervalSinceNow > -15.0 {
+                    resolvedName = finalTargetURL.lastPathComponent
+                    isSuccess = true
+                } else if !fileManager.fileExists(atPath: finalTargetURL.path) {
+                    isSuccess = false
+                } else {
+                    isSuccess = true
+                    resolvedName = finalTargetURL.lastPathComponent
+                }
+            }
+
+            // Check 2: If not verified or if it was an "Unconfirmed" Chrome placeholder,
+            // inspect the Downloads folder for any file created or modified in the last 6 seconds
+            if !isSuccess || resolvedName.lowercased().hasPrefix("unconfirmed") {
+                if let files = try? fileManager.contentsOfDirectory(
+                    at: downloadsURL,
+                    includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+                    options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
+                ) {
+                    let cutoff = Date().addingTimeInterval(-6.0)
+                    let recentFiles = files.compactMap { url -> (url: URL, date: Date, size: Int64)? in
+                        let ext = url.pathExtension.lowercased()
+                        guard ext != "crdownload" && ext != "download" && ext != "part" else { return nil }
+                        guard let vals = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
+                              let modDate = vals.contentModificationDate,
+                              modDate > cutoff,
+                              let fileSize = vals.fileSize,
+                              fileSize > 0 else {
+                            return nil
+                        }
+                        return (url, modDate, Int64(fileSize))
+                    }
+
+                    if let newest = recentFiles.max(by: { $0.date < $1.date }) {
+                        resolvedName = newest.url.lastPathComponent
+                        isSuccess = true
+                    }
+                }
+            }
+
+            // Clean up placeholder names if still unresolved
+            if resolvedName.lowercased().hasPrefix("unconfirmed") {
+                resolvedName = isSuccess ? "File" : "Download"
+            }
+
+            let statusText = isSuccess ? "Download Complete" : "Download Failed"
+
+            HardwareTelemetryService.shared.triggerTransientHUD(
+                .download(
+                    fileName: resolvedName,
+                    statusText: statusText,
+                    isSuccess: isSuccess,
+                    progress: nil
+                ),
+                duration: 3.5
+            )
+        }
+    }
+
     private func cleanDownloadName(for url: URL) -> String {
         var base = url.deletingPathExtension().lastPathComponent
         if base.lowercased().hasSuffix(".crdownload") || base.lowercased().hasSuffix(".download") {
@@ -185,14 +282,71 @@ public final class DownloadMonitorService: ObservableObject {
 
     private func readSafariDownloadProgress(packageURL: URL) -> (current: Int64, total: Int64?) {
         let plistURL = packageURL.appendingPathComponent("Info.plist")
-        guard let data = try? Data(contentsOf: plistURL),
-              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
-            return (0, nil)
+        var current: Int64 = 0
+        var total: Int64? = nil
+
+        if let data = try? Data(contentsOf: plistURL),
+           let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
+            current = (dict["NSURLDownloadBytesReceived"] as? NSNumber)?.int64Value ?? 0
+            total = (dict["NSURLDownloadTotalBytesExpected"] as? NSNumber)?.int64Value
         }
 
-        let current = (dict["NSURLDownloadBytesReceived"] as? Int64) ?? 0
-        let total = dict["NSURLDownloadTotalBytesExpected"] as? Int64
+        // Fallback: measure actual payload size inside package if current is reported as 0
+        if current == 0 {
+            if let files = try? FileManager.default.contentsOfDirectory(at: packageURL, includingPropertiesForKeys: [.fileSizeKey]) {
+                for file in files where file.lastPathComponent != "Info.plist" {
+                    if let size = (try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
+                        current += Int64(size)
+                    }
+                }
+            }
+        }
         return (current, total)
+    }
+
+    nonisolated private static func readSourceURL(for fileURL: URL) -> URL? {
+        let key = "com.apple.metadata:kMDItemWhereFroms"
+        let length = getxattr(fileURL.path, key, nil, 0, 0, 0)
+        guard length > 0 else { return nil }
+        var data = Data(count: length)
+        let readLen = data.withUnsafeMutableBytes { ptr in
+            getxattr(fileURL.path, key, ptr.baseAddress, length, 0, 0)
+        }
+        guard readLen == length else { return nil }
+        guard let list = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String],
+              let first = list.first,
+              let url = URL(string: first),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return nil
+        }
+        return url
+    }
+
+    private func requestTotalSizeIfAvailable(for url: URL) {
+        guard !pendingTotalSizeLookups.contains(url), cachedTotalSizes[url] == nil else { return }
+        pendingTotalSizeLookups.insert(url)
+
+        let targetURL = url
+        Task.detached(priority: .utility) { [weak self] in
+            guard let sourceURL = Self.readSourceURL(for: targetURL) else { return }
+            var req = URLRequest(url: sourceURL)
+            req.httpMethod = "HEAD"
+            req.timeoutInterval = 3.5
+
+            let session = URLSession(configuration: .ephemeral)
+            guard let (_, response) = try? await session.data(for: req),
+                  let http = response as? HTTPURLResponse,
+                  http.statusCode >= 200 && http.statusCode < 400,
+                  http.expectedContentLength > 0 else {
+                return
+            }
+
+            let length = http.expectedContentLength
+            await MainActor.run { [weak self] in
+                self?.cachedTotalSizes[targetURL] = length
+            }
+        }
     }
 
     public static func formatFileSize(_ bytes: Int64) -> String {

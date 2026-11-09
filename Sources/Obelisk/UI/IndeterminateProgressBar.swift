@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A sleek, hardware-accelerated animated indeterminate progress bar matching macOS native aesthetics.
-/// Used during streaming downloads or when the total download payload size is not exposed by the browser.
+/// A sleek, hardware-accelerated animated progress bar matching macOS native aesthetics.
+/// Sweeps strictly from left to right without reversing.
 public struct IndeterminateProgressBar: View {
     public let width: CGFloat
     public let height: CGFloat
@@ -14,23 +14,30 @@ public struct IndeterminateProgressBar: View {
     }
 
     public var body: some View {
-        ZStack(alignment: .leading) {
-            // Capsule track
-            Capsule()
-                .fill(Color.white.opacity(0.20))
+        GeometryReader { geo in
+            let barWidth = geo.size.width
+            let barHeight = geo.size.height
+            let pillWidth = max(14, barWidth * 0.42)
 
-            // Sweeping glowing bar indicator
-            Capsule()
-                .fill(Color.white)
-                .frame(width: width * 0.42, height: height)
-                .offset(x: phase * (width * 0.58))
+            ZStack(alignment: .leading) {
+                // Background track
+                Capsule()
+                    .fill(Color.white.opacity(0.20))
+
+                // Indicator traveling strictly from left to right
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: pillWidth, height: barHeight)
+                    .offset(x: -pillWidth + (phase * (barWidth + pillWidth)))
+            }
+            .clipShape(Capsule())
         }
         .frame(width: width, height: height)
-        .clipShape(Capsule())
         .onAppear {
+            phase = 0.0
             withAnimation(
-                .easeInOut(duration: 1.1)
-                .repeatForever(autoreverses: true)
+                .linear(duration: 1.1)
+                .repeatForever(autoreverses: false)
             ) {
                 phase = 1.0
             }

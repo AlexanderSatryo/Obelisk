@@ -66,8 +66,14 @@ public struct NotchTransientHUDBar: View {
             return ("sun.max.fill", Color(red: 255/255, green: 215/255, blue: 60/255))
         case .capsLock(let isOn):
             return (isOn ? "capslock.fill" : "capslock", isOn ? .white : .white.opacity(0.55))
-        case .download(_, _, let isSuccess, _):
-            return (isSuccess ? "arrow.down.circle" : "exclamationmark.circle", .white)
+        case .download(_, let statusText, let isSuccess, _):
+            if isSuccess && (statusText == "Download Complete" || statusText.lowercased().contains("complete")) {
+                return ("checkmark.circle.fill", calmSageGreen)
+            } else if !isSuccess || statusText == "Download Failed" {
+                return ("exclamationmark.triangle.fill", calmWarmAmber)
+            } else {
+                return ("arrow.down.circle", .white)
+            }
         }
     }
 
@@ -125,7 +131,9 @@ public struct NotchTransientHUDBar: View {
                 HStack(spacing: 6) {
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.white.opacity(0.20))
-                        Capsule().fill(Color.white).frame(width: max(4, min(56, 56 * CGFloat(frac))))
+                        Capsule().fill(Color.white)
+                            .frame(width: max(4, min(56, 56 * CGFloat(frac))))
+                            .animation(.linear(duration: 0.3), value: frac)
                     }
                     .frame(width: 56, height: 4)
                     Text("\(Int(round(frac * 100)))%")
@@ -133,9 +141,13 @@ public struct NotchTransientHUDBar: View {
                         .foregroundColor(.white)
                 }
             } else if statusText == "Download Complete" || statusText == "Download Failed" {
-                Text(statusText)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(isSuccess ? .white : .white.opacity(0.75))
+                HStack(spacing: 5) {
+                    Image(systemName: isSuccess ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                        .foregroundColor(isSuccess ? calmSageGreen : calmWarmAmber)
+                    Text(statusText)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(isSuccess ? .white : .white.opacity(0.75))
+                }
             } else {
                 HStack(spacing: 6) {
                     IndeterminateProgressBar(width: 56, height: 4)
@@ -363,11 +375,29 @@ public struct NotchTransientHUDBar: View {
                     .lineLimit(1)
             }
 
-        case .download(let fileName, _, _, _):
+        case .download(let fileName, let statusText, let isSuccess, _):
             HStack(spacing: 6) {
-                Image(systemName: "arrow.down.circle")
+                let iconName: String = {
+                    if isSuccess && (statusText == "Download Complete" || statusText.lowercased().contains("complete")) {
+                        return "checkmark.circle.fill"
+                    } else if !isSuccess || statusText == "Download Failed" {
+                        return "exclamationmark.circle.fill"
+                    } else {
+                        return "arrow.down.circle"
+                    }
+                }()
+                let iconColor: Color = {
+                    if isSuccess && (statusText == "Download Complete" || statusText.lowercased().contains("complete")) {
+                        return calmSageGreen
+                    } else if !isSuccess || statusText == "Download Failed" {
+                        return calmWarmAmber
+                    } else {
+                        return .white
+                    }
+                }()
+                Image(systemName: iconName)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(iconColor)
 
                 Text(fileName)
                     .font(.system(size: 11, weight: .semibold))
@@ -473,6 +503,7 @@ public struct NotchTransientHUDBar: View {
                         Capsule()
                             .fill(Color.white)
                             .frame(width: max(4, min(48, 48 * CGFloat(frac))))
+                            .animation(.linear(duration: 0.3), value: frac)
                     }
                     .frame(width: 48, height: 4)
 
@@ -485,7 +516,7 @@ public struct NotchTransientHUDBar: View {
             } else if statusText == "Download Complete" || statusText == "Download Failed" {
                 Text(statusText)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(isSuccess ? .white : .white.opacity(0.75))
+                    .foregroundColor(isSuccess ? calmSageGreen : calmWarmAmber)
                     .lineLimit(1)
             } else {
                 HStack(spacing: 6) {

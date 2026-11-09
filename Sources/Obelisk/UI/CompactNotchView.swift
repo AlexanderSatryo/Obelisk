@@ -247,6 +247,7 @@ public struct CompactNotchView: View {
                         Capsule()
                             .fill(Color.white)
                             .frame(width: max(4, min(48, 48 * CGFloat(frac))))
+                            .animation(.linear(duration: 0.3), value: frac)
                     }
                     .frame(width: 48, height: 4)
 
