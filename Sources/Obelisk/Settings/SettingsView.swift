@@ -289,6 +289,10 @@ public struct SettingsView: View {
         .onChange(of: draft) { newDraft in
             hasUnsavedChanges = (newDraft != settings.makeDraft())
         }
+        .onChange(of: draft.compactWidthOffset) { newOffset in
+            settings.compactWidthOffset = newOffset
+            WindowManager.shared.updateCompactWidth(animated: true)
+        }
         .onChange(of: searchText) { newQuery in
             let q = newQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             guard !q.isEmpty else { return }
@@ -720,7 +724,7 @@ public struct SettingsView: View {
                         title: "Compact Width Offset",
                         isHighlighted: matchesCurrentQuery("geometry"),
                         value: $draft.compactWidthOffset,
-                        range: 40...220
+                        range: 40...380
                     )
 
                     PreferenceSliderRow(
@@ -1669,7 +1673,6 @@ public struct SettingsView: View {
                     }
                 }
             }
-            .offset(x: 3.5)
             .frame(width: pWingSlot)
 
             Spacer()
@@ -1728,7 +1731,6 @@ public struct SettingsView: View {
                     }
                 }
             }
-            .offset(x: -3.5)
             .frame(width: pWingSlot)
         }
         .padding(.horizontal, 4)
