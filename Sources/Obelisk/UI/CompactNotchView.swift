@@ -98,38 +98,27 @@ public struct CompactNotchView: View {
         let totalHeight = windowManager.compactHeight
         let topRowHeight = max(24, ScreenGeometry.notchSize.height + CGFloat(settings.compactHeightOffset))
 
-        let notchWidth = ScreenGeometry.notchSize.width
-        let wingWidth = max(0, (totalWidth - notchWidth) / 2.0)
-
-        let isDownload = settings.showDownloadsOnStandby && downloadService.isDownloading
+        let physicalBezelWidth = ScreenGeometry.hasPhysicalNotch ? ScreenGeometry.physicalNotchBodyWidth : ScreenGeometry.notchSize.width
+        let earR = windowManager.activeCompactTopEarRadius
+        let visibleWingWidth = max(0, (totalWidth - physicalBezelWidth - (earR * 2.0)) / 2.0)
 
         HStack(spacing: 0) {
-            if shouldShowWings && wingWidth >= 16 {
-                if isDownload {
-                    HStack {
-                        leftWingView(wingWidth: wingWidth)
-                    }
-                    .frame(width: wingWidth, alignment: .center)
+            if shouldShowWings && visibleWingWidth >= 16 {
+                Color.clear.frame(width: earR, height: topRowHeight)
 
-                    Spacer(minLength: notchWidth)
-
-                    HStack {
-                        rightWingView
-                    }
-                    .frame(width: wingWidth, alignment: .center)
-                } else {
-                    HStack {
-                        leftWingView(wingWidth: wingWidth)
-                    }
-                    .frame(width: wingWidth, alignment: .center)
-
-                    Spacer(minLength: notchWidth)
-
-                    HStack {
-                        rightWingView
-                    }
-                    .frame(width: wingWidth, alignment: .center)
+                HStack {
+                    leftWingView(wingWidth: visibleWingWidth)
                 }
+                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+
+                Color.clear.frame(width: physicalBezelWidth, height: topRowHeight)
+
+                HStack {
+                    rightWingView
+                }
+                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+
+                Color.clear.frame(width: earR, height: topRowHeight)
             }
         }
         .frame(width: totalWidth, height: topRowHeight)

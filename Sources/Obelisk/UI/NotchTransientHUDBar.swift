@@ -261,36 +261,27 @@ public struct NotchTransientHUDBar: View {
     private var wingsBar: some View {
         let totalWidth = isExpanded ? WindowManager.shared.expandedSize.width : WindowManager.shared.compactWidth
         let topRowHeight = max(24, ScreenGeometry.notchSize.height + CGFloat(settings.compactHeightOffset))
-        let notchWidth = ScreenGeometry.notchSize.width
-        let wingWidth = max(0, (totalWidth - notchWidth) / 2.0)
+        let physicalBezelWidth = ScreenGeometry.hasPhysicalNotch ? ScreenGeometry.physicalNotchBodyWidth : ScreenGeometry.notchSize.width
+        let earR = isExpanded ? CGFloat(settings.expandedTopCornerRadius) : WindowManager.shared.activeCompactTopEarRadius
+        let visibleWingWidth = max(0, (totalWidth - physicalBezelWidth - (earR * 2.0)) / 2.0)
 
         return HStack(spacing: 0) {
-            if wingWidth >= 16 {
-                if isDownloadHUD {
-                    HStack {
-                        hudLeftWingContent(wingWidth: wingWidth)
-                    }
-                    .frame(width: wingWidth, alignment: .center)
+            if visibleWingWidth >= 16 {
+                Color.clear.frame(width: earR, height: topRowHeight)
 
-                    Spacer(minLength: notchWidth)
-
-                    HStack {
-                        hudRightWingContent(wingWidth: wingWidth)
-                    }
-                    .frame(width: wingWidth, alignment: .center)
-                } else {
-                    HStack {
-                        hudLeftWingContent(wingWidth: wingWidth)
-                    }
-                    .frame(width: wingWidth, alignment: .center)
-
-                    Spacer(minLength: notchWidth)
-
-                    HStack {
-                        hudRightWingContent(wingWidth: wingWidth)
-                    }
-                    .frame(width: wingWidth, alignment: .center)
+                HStack {
+                    hudLeftWingContent(wingWidth: visibleWingWidth)
                 }
+                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+
+                Color.clear.frame(width: physicalBezelWidth, height: topRowHeight)
+
+                HStack {
+                    hudRightWingContent(wingWidth: visibleWingWidth)
+                }
+                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+
+                Color.clear.frame(width: earR, height: topRowHeight)
             }
         }
         .frame(width: totalWidth, height: topRowHeight)
