@@ -261,25 +261,26 @@ public struct NotchTransientHUDBar: View {
     private var wingsBar: some View {
         let totalWidth = isExpanded ? WindowManager.shared.expandedSize.width : WindowManager.shared.compactWidth
         let topRowHeight = max(24, ScreenGeometry.notchSize.height + CGFloat(settings.compactHeightOffset))
-        let physicalBezelWidth = ScreenGeometry.hasPhysicalNotch ? ScreenGeometry.physicalNotchBodyWidth : ScreenGeometry.notchSize.width
+        let bezelWidth = ScreenGeometry.notchSize.width
+        let wingWidth = max(0, (totalWidth - bezelWidth) / 2.0)
         let earR = isExpanded ? CGFloat(settings.expandedTopCornerRadius) : WindowManager.shared.activeCompactTopEarRadius
-        let visibleWingWidth = max(0, (totalWidth - physicalBezelWidth - (earR * 2.0)) / 2.0)
+        let visibleBodyWidth = max(0, wingWidth - earR)
 
         return HStack(spacing: 0) {
-            if visibleWingWidth >= 16 {
+            if visibleBodyWidth >= 16 {
                 Color.clear.frame(width: earR, height: topRowHeight)
 
                 HStack {
-                    hudLeftWingContent(wingWidth: visibleWingWidth)
+                    hudLeftWingContent(wingWidth: visibleBodyWidth)
                 }
-                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+                .frame(width: visibleBodyWidth, height: topRowHeight, alignment: .center)
 
-                Color.clear.frame(width: physicalBezelWidth, height: topRowHeight)
+                Color.clear.frame(width: bezelWidth, height: topRowHeight)
 
                 HStack {
-                    hudRightWingContent(wingWidth: visibleWingWidth)
+                    hudRightWingContent(wingWidth: visibleBodyWidth)
                 }
-                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+                .frame(width: visibleBodyWidth, height: topRowHeight, alignment: .center)
 
                 Color.clear.frame(width: earR, height: topRowHeight)
             }

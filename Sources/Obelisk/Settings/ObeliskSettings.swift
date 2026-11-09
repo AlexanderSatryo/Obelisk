@@ -477,7 +477,7 @@ public struct ObeliskSettingsDraft: Equatable {
     public var compactTimerColorMode: CompactTimerColorMode = .followMedia
     public var colorTheme: NotchColorTheme = .soft
     public var colorBrightness: Double = 1.0
-    public var compactWidthOffset: Double = 148.0
+    public var compactWidthOffset: Double = 112.0
     public var compactHeightOffset: Double = 0.0
     public var standbyHUDStyle: StandbyHUDStyle = .horizontalWings
     public var showCapsLockHUD: Bool = true
@@ -933,8 +933,7 @@ public final class ObeliskSettings: ObservableObject {
         self.compactTimerColorMode = CompactTimerColorMode(rawValue: defaults.string(forKey: "cfg_compactTimerColorMode") ?? "") ?? .followMedia
         self.colorTheme = NotchColorTheme(rawValue: defaults.string(forKey: "cfg_colorTheme") ?? "") ?? .soft
         self.colorBrightness = defaults.object(forKey: "cfg_colorBrightness") as? Double ?? 1.0
-        let loadedCompactOffset = defaults.object(forKey: "cfg_compactWidthOffset") as? Double ?? 148.0
-        self.compactWidthOffset = loadedCompactOffset <= 112.0 ? 148.0 : loadedCompactOffset
+        self.compactWidthOffset = defaults.object(forKey: "cfg_compactWidthOffset") as? Double ?? 112.0
         self.compactHeightOffset = defaults.object(forKey: "cfg_compactHeightOffset") as? Double ?? 0.0
         self.standbyHUDStyle = StandbyHUDStyle(rawValue: defaults.string(forKey: "cfg_standbyHUDStyle") ?? "") ?? .horizontalWings
         self.showCapsLockHUD = defaults.object(forKey: "cfg_showCapsLockHUD") as? Bool ?? true

@@ -12,12 +12,13 @@ public struct NotificationNotchView: View {
     public var body: some View {
         let totalWidth = windowManager.compactWidth
         let topRowHeight = max(24, ScreenGeometry.notchSize.height + CGFloat(settings.compactHeightOffset))
-        let physicalBezelWidth = ScreenGeometry.hasPhysicalNotch ? ScreenGeometry.physicalNotchBodyWidth : ScreenGeometry.notchSize.width
+        let bezelWidth = ScreenGeometry.notchSize.width
+        let wingWidth = max(0, (totalWidth - bezelWidth) / 2.0)
         let earR = windowManager.activeCompactTopEarRadius
-        let visibleWingWidth = max(0, (totalWidth - physicalBezelWidth - (earR * 2.0)) / 2.0)
+        let visibleBodyWidth = max(0, wingWidth - earR)
 
         HStack(spacing: 0) {
-            if visibleWingWidth >= 16 {
+            if visibleBodyWidth >= 16 {
                 Color.clear.frame(width: earR, height: topRowHeight)
 
                 // Left Wing: [App Logo - App Name]
@@ -29,9 +30,9 @@ public struct NotificationNotchView: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
                 }
-                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+                .frame(width: visibleBodyWidth, height: topRowHeight, alignment: .center)
 
-                Color.clear.frame(width: physicalBezelWidth, height: topRowHeight)
+                Color.clear.frame(width: bezelWidth, height: topRowHeight)
 
                 // Right Wing: [New Notifications!]
                 HStack(spacing: 0) {
@@ -40,7 +41,7 @@ public struct NotificationNotchView: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
                 }
-                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+                .frame(width: visibleBodyWidth, height: topRowHeight, alignment: .center)
 
                 Color.clear.frame(width: earR, height: topRowHeight)
             }

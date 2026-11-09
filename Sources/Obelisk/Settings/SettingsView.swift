@@ -720,7 +720,7 @@ public struct SettingsView: View {
                         title: "Compact Width Offset",
                         isHighlighted: matchesCurrentQuery("geometry"),
                         value: $draft.compactWidthOffset,
-                        range: 40...280
+                        range: 40...220
                     )
 
                     PreferenceSliderRow(

@@ -155,15 +155,15 @@ public final class WindowManager: ObservableObject {
         }
 
         // Symmetrical margin on both sides of content:
-        // Ensures content sits comfortably centered between outer edge and physical bezel with generous 28pt margin.
-        let sideMargin: CGFloat = 28
+        // Ensures content sits comfortably centered between outer edge and physical bezel with at least 24pt margin.
+        let sideMargin: CGFloat = 24
         let leftWingNeeded = leftContentWidth + (sideMargin * 2)
         let rightWingNeeded = rightContentWidth + (sideMargin * 2)
 
         // Symmetrical balance: both wings match the larger required width
         let desiredWing = max(leftWingNeeded, rightWingNeeded)
-        // Clamp: min 130 pt, max 275 pt (safe margin against macOS menu bar items)
-        return min(max(desiredWing, 130), 275)
+        // Clamp: min 120 pt, max 265 pt (safe margin against macOS menu bar items)
+        return min(max(desiredWing, 120), 265)
     }
 
     /// Recomputes the compact notch width and height based on transient connection HUDs, active media, and user preferences.
@@ -233,11 +233,11 @@ public final class WindowManager: ObservableObject {
             let nameWidth = ceil((notif.appName as NSString).size(withAttributes: [.font: font]).width)
             let leftContentWidth = 16 + 6 + nameWidth
             let rightContentWidth: CGFloat = 118 // "New Notifications!"
-            let sideMargin: CGFloat = 28
+            let sideMargin: CGFloat = 24
             let leftWingNeeded = leftContentWidth + (sideMargin * 2)
             let rightWingNeeded = rightContentWidth + (sideMargin * 2)
             let desiredWing = max(leftWingNeeded, rightWingNeeded)
-            let wingW = min(max(desiredWing, 136), 275)
+            let wingW = min(max(desiredWing, 130), 265)
             let extraWidth = max(CGFloat(settings.compactWidthOffset), wingW * 2)
             targetWidth = baseWidth + extraWidth
             targetHeight = customBaseHeight

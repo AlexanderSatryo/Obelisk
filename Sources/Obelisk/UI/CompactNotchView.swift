@@ -98,25 +98,27 @@ public struct CompactNotchView: View {
         let totalHeight = windowManager.compactHeight
         let topRowHeight = max(24, ScreenGeometry.notchSize.height + CGFloat(settings.compactHeightOffset))
 
-        let physicalBezelWidth = ScreenGeometry.hasPhysicalNotch ? ScreenGeometry.physicalNotchBodyWidth : ScreenGeometry.notchSize.width
+        // Lebar bezel bawaan MacBook Pro M5 (185 pt safe area cutout):
+        let bezelWidth = ScreenGeometry.notchSize.width
+        let wingWidth = max(0, (totalWidth - bezelWidth) / 2.0)
         let earR = windowManager.activeCompactTopEarRadius
-        let visibleWingWidth = max(0, (totalWidth - physicalBezelWidth - (earR * 2.0)) / 2.0)
+        let visibleBodyWidth = max(0, wingWidth - earR)
 
         HStack(spacing: 0) {
-            if shouldShowWings && visibleWingWidth >= 16 {
+            if shouldShowWings && visibleBodyWidth >= 16 {
                 Color.clear.frame(width: earR, height: topRowHeight)
 
                 HStack {
-                    leftWingView(wingWidth: visibleWingWidth)
+                    leftWingView(wingWidth: visibleBodyWidth)
                 }
-                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+                .frame(width: visibleBodyWidth, height: topRowHeight, alignment: .center)
 
-                Color.clear.frame(width: physicalBezelWidth, height: topRowHeight)
+                Color.clear.frame(width: bezelWidth, height: topRowHeight)
 
                 HStack {
                     rightWingView
                 }
-                .frame(width: visibleWingWidth, height: topRowHeight, alignment: .center)
+                .frame(width: visibleBodyWidth, height: topRowHeight, alignment: .center)
 
                 Color.clear.frame(width: earR, height: topRowHeight)
             }
