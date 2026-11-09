@@ -138,25 +138,25 @@ public final class WindowManager: ObservableObject {
         let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
         let nameWidth = ceil((fileName as NSString).size(withAttributes: [.font: font]).width)
 
-        // Left wing: icon (13pt) + spacing (6pt) + filename + padding (30pt for comfortable corner margins)
-        let leftRequired = 13 + 6 + nameWidth + 30
+        // Left wing: outer margin (14pt) + icon (13pt) + spacing (6pt) + filename + inner margin to bezel (16pt)
+        let leftRequired = 14 + 13 + 6 + nameWidth + 16
 
         // Right wing:
         let rightRequired: CGFloat
         if let st = statusText, (st == "Download Complete" || st == "Download Failed") {
             let stWidth = ceil((st as NSString).size(withAttributes: [.font: font]).width)
-            rightRequired = stWidth + 28
+            rightRequired = 14 + stWidth + 16
         } else {
-            // Progress bar (48pt) + spacing (6pt) + size/percent text (~30-50pt) + padding (26pt)
+            // outer margin (14pt) + progress bar (48pt) + spacing (6pt) + size/percent text + inner margin to bezel (16pt)
             let txt = statusText ?? (progress != nil ? "\(Int(round(progress! * 100)))%" : "100 MB")
             let txtWidth = ceil((txt as NSString).size(withAttributes: [.font: font]).width)
-            rightRequired = 48 + 6 + txtWidth + 26
+            rightRequired = 14 + 48 + 6 + txtWidth + 16
         }
 
         // Symmetrical balance: both wings match the largest required width
         let desiredWing = max(leftRequired, rightRequired)
-        // Clamp: min 105 pt (ensures progress bar + text never get squished), max 260 pt (safe margin against menu bar items)
-        return min(max(desiredWing, 105), 260)
+        // Clamp: min 110 pt, max 260 pt (safe margin against menu bar items)
+        return min(max(desiredWing, 110), 260)
     }
 
     /// Recomputes the compact notch width and height based on transient connection HUDs, active media, and user preferences.

@@ -253,6 +253,11 @@ public struct NotchTransientHUDBar: View {
 
     // MARK: - Wings bar (used while in horizontal wings mode or while dashboard is expanded)
 
+    private var isDownloadHUD: Bool {
+        if case .download = hud { return true }
+        return false
+    }
+
     private var wingsBar: some View {
         let totalWidth = isExpanded ? WindowManager.shared.expandedSize.width : WindowManager.shared.compactWidth
         let topRowHeight = max(24, ScreenGeometry.notchSize.height + CGFloat(settings.compactHeightOffset))
@@ -261,17 +266,37 @@ public struct NotchTransientHUDBar: View {
 
         return HStack(spacing: 0) {
             if wingWidth >= 16 {
-                HStack {
-                    hudLeftWingContent(wingWidth: wingWidth)
-                }
-                .frame(width: wingWidth, alignment: .center)
+                if isDownloadHUD {
+                    HStack(spacing: 0) {
+                        Spacer().frame(width: 14)
+                        hudLeftWingContent(wingWidth: wingWidth)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(width: wingWidth)
 
-                Spacer(minLength: notchWidth)
+                    Spacer(minLength: notchWidth)
 
-                HStack {
-                    hudRightWingContent(wingWidth: wingWidth)
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        hudRightWingContent(wingWidth: wingWidth)
+                        Spacer().frame(width: 14)
+                    }
+                    .frame(width: wingWidth)
+                } else {
+                    HStack {
+                        hudLeftWingContent(wingWidth: wingWidth)
+                            .offset(x: 5.5)
+                    }
+                    .frame(width: wingWidth, alignment: .center)
+
+                    Spacer(minLength: notchWidth)
+
+                    HStack {
+                        hudRightWingContent(wingWidth: wingWidth)
+                            .offset(x: -5.5)
+                    }
+                    .frame(width: wingWidth, alignment: .center)
                 }
-                .frame(width: wingWidth, alignment: .center)
             }
         }
         .frame(width: totalWidth, height: topRowHeight)
@@ -364,7 +389,6 @@ public struct NotchTransientHUDBar: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            .frame(maxWidth: max(0, wingWidth - 24))
         }
     }
 

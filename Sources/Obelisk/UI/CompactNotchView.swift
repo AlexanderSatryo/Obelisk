@@ -101,21 +101,41 @@ public struct CompactNotchView: View {
         let notchWidth = ScreenGeometry.notchSize.width
         let wingWidth = max(0, (totalWidth - notchWidth) / 2.0)
 
+        let isDownload = settings.showDownloadsOnStandby && downloadService.isDownloading
+
         HStack(spacing: 0) {
             if shouldShowWings && wingWidth >= 16 {
-                HStack {
-                    leftWingView(wingWidth: wingWidth)
-                        .offset(x: 5.5)
-                }
-                .frame(width: wingWidth, alignment: .center)
+                if isDownload {
+                    HStack(spacing: 0) {
+                        Spacer().frame(width: 14)
+                        leftWingView(wingWidth: wingWidth)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(width: wingWidth)
 
-                Spacer(minLength: notchWidth)
+                    Spacer(minLength: notchWidth)
 
-                HStack {
-                    rightWingView
-                        .offset(x: -5.5)
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        rightWingView
+                        Spacer().frame(width: 14)
+                    }
+                    .frame(width: wingWidth)
+                } else {
+                    HStack {
+                        leftWingView(wingWidth: wingWidth)
+                            .offset(x: 5.5)
+                    }
+                    .frame(width: wingWidth, alignment: .center)
+
+                    Spacer(minLength: notchWidth)
+
+                    HStack {
+                        rightWingView
+                            .offset(x: -5.5)
+                    }
+                    .frame(width: wingWidth, alignment: .center)
                 }
-                .frame(width: wingWidth, alignment: .center)
             }
         }
         .frame(width: totalWidth, height: topRowHeight)
@@ -141,7 +161,6 @@ public struct CompactNotchView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
-            .frame(maxWidth: max(0, wingWidth - 24))
         } else {
             standardLeftWingContent
         }
