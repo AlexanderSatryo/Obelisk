@@ -503,10 +503,6 @@ public struct ObeliskSettingsDraft: Equatable {
     public var notificationFilterCategory: NotificationFilterCategory = .all
     public var requireTouchIDForNotifications: Bool = true
     public var notificationAutoDismissSeconds: Double = 10.0
-    public var enableSystemTab: Bool {
-        get { enableFileTab }
-        set { enableFileTab = newValue }
-    }
     public var defaultOpeningTab: DefaultOpeningTab = .lastUsed
 
     public var fileTrayCapacity: Int = 10
@@ -831,10 +827,6 @@ public final class ObeliskSettings: ObservableObject {
     }
     @Published public var notificationAutoDismissSeconds: Double {
         didSet { defaults.set(notificationAutoDismissSeconds, forKey: "cfg_notificationAutoDismissSeconds") }
-    }
-    public var enableSystemTab: Bool {
-        get { enableFileTab }
-        set { enableFileTab = newValue }
     }
     @Published public var defaultOpeningTab: DefaultOpeningTab {
         didSet { defaults.set(defaultOpeningTab.rawValue, forKey: "cfg_defaultOpeningTab") }

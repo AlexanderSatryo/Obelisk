@@ -39,13 +39,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self,
-            selector: #selector(openSettings),
-            name: Notification.Name("com.obelisk.openSettings"),
-            object: nil
-        )
-
-        DistributedNotificationCenter.default().addObserver(
-            self,
             selector: #selector(toggleNotch),
             name: Notification.Name("com.obelisk.toggleNotch"),
             object: nil
