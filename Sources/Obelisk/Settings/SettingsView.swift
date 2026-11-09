@@ -1050,13 +1050,6 @@ public struct SettingsView: View {
                             )
                         }
 
-                        PreferenceToggleRow(
-                            title: "Require Touch ID for Details",
-                            subtitle: "Hides sender and message content behind biometrics verification",
-                            isHighlighted: matchesCurrentQuery("notifications"),
-                            isOn: $draft.requireTouchIDForNotifications
-                        )
-
                         PreferenceSliderRow(
                             title: "Auto-Dismiss Timeout",
                             isHighlighted: matchesCurrentQuery("notifications"),

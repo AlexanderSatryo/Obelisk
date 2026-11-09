@@ -511,7 +511,6 @@ public struct ObeliskSettingsDraft: Equatable {
 
     public var skipIntervalSeconds: Int = 15
     public var showLyricsInNotch: Bool = true
-    public var showLyricsButton: Bool = true
     public var autoExpandLyrics: Bool = false
     public var lyricsFontSizeScale: LyricsFontSizeScale = .standard
     public var lyricsSyncOffsetMs: Int = 380
@@ -610,7 +609,6 @@ public struct ObeliskSettingsDraft: Equatable {
         case .media:
             self.skipIntervalSeconds = def.skipIntervalSeconds
             self.showLyricsInNotch = def.showLyricsInNotch
-            self.showLyricsButton = def.showLyricsButton
             self.autoExpandLyrics = def.autoExpandLyrics
             self.lyricsFontSizeScale = def.lyricsFontSizeScale
             self.lyricsSyncOffsetMs = def.lyricsSyncOffsetMs
@@ -854,9 +852,6 @@ public final class ObeliskSettings: ObservableObject {
             WindowManager.shared.updateHeightForCurrentTab()
         }
     }
-    @Published public var showLyricsButton: Bool {
-        didSet { defaults.set(showLyricsButton, forKey: "cfg_showLyricsButton") }
-    }
     @Published public var autoExpandLyrics: Bool {
         didSet {
             defaults.set(autoExpandLyrics, forKey: "cfg_autoExpandLyrics")
@@ -980,7 +975,6 @@ public final class ObeliskSettings: ObservableObject {
 
         self.skipIntervalSeconds = defaults.object(forKey: "cfg_skipIntervalSeconds") as? Int ?? 15
         self.showLyricsInNotch = defaults.object(forKey: "cfg_showLyricsInNotch") as? Bool ?? true
-        self.showLyricsButton = defaults.object(forKey: "cfg_showLyricsButton") as? Bool ?? true
         self.autoExpandLyrics = defaults.object(forKey: "cfg_autoExpandLyrics") as? Bool ?? false
         self.lyricsFontSizeScale = LyricsFontSizeScale(rawValue: defaults.string(forKey: "cfg_lyricsFontSizeScale") ?? "") ?? .standard
         self.lyricsSyncOffsetMs = defaults.object(forKey: "cfg_lyricsSyncOffsetMs") as? Int ?? 380
@@ -1051,7 +1045,6 @@ public final class ObeliskSettings: ObservableObject {
 
         d.skipIntervalSeconds = skipIntervalSeconds
         d.showLyricsInNotch = showLyricsInNotch
-        d.showLyricsButton = showLyricsButton
         d.autoExpandLyrics = autoExpandLyrics
         d.lyricsFontSizeScale = lyricsFontSizeScale
         d.lyricsSyncOffsetMs = lyricsSyncOffsetMs
@@ -1122,7 +1115,6 @@ public final class ObeliskSettings: ObservableObject {
 
         skipIntervalSeconds = draft.skipIntervalSeconds
         showLyricsInNotch = draft.showLyricsInNotch
-        showLyricsButton = draft.showLyricsButton
         autoExpandLyrics = draft.autoExpandLyrics
         lyricsFontSizeScale = draft.lyricsFontSizeScale
         lyricsSyncOffsetMs = draft.lyricsSyncOffsetMs

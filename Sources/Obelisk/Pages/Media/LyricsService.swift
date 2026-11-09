@@ -62,11 +62,19 @@ public final class LyricsService: ObservableObject {
             self.hasLyrics = !lyricsData.lines.isEmpty
 
             if self.hasLyrics {
+                if ObeliskSettings.shared.autoExpandLyrics {
+                    self.isLyricsExpanded = true
+                    WindowManager.shared.updateHeightForCurrentTab()
+                }
                 let liveTrack = MediaManager.shared.currentTrack
                 let livePos = (liveTrack.title == track.title) ? liveTrack.position : track.position
                 let livePlaying = (liveTrack.title == track.title) ? liveTrack.isPlaying : track.isPlaying
                 self.updatePosition(livePos, isPlaying: livePlaying, forceSnap: true)
             } else {
+                if ObeliskSettings.shared.autoExpandLyrics {
+                    self.isLyricsExpanded = false
+                    WindowManager.shared.updateHeightForCurrentTab()
+                }
                 self.currentLineText = "Lyrics not available"
                 self.nextLineText = ""
             }
@@ -82,6 +90,10 @@ public final class LyricsService: ObservableObject {
         nextLineText = ""
         hasLyrics = false
         isLoading = false
+        if ObeliskSettings.shared.autoExpandLyrics {
+            isLyricsExpanded = false
+            WindowManager.shared.updateHeightForCurrentTab()
+        }
     }
 
     // MARK: - Symmetric Phase-Locked Position Sync & 30Hz Sub-Second Interpolation

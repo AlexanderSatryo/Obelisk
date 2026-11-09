@@ -305,23 +305,19 @@ public struct MediaPlayerView: View {
             // Row 3: Bottom Controls (Lyrics Button, Transport Controls, Audio Route Speaker)
             HStack(spacing: 0) {
                 // Speech Bubble Lyrics Toggle Button (Left)
-                if settings.showLyricsButton {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            settings.showLyricsInNotch.toggle()
-                        }
-                    }) {
-                        Image(systemName: "quote.bubble.fill")
-                            .font(.system(size: 11.5, weight: .medium))
-                            .foregroundColor(settings.showLyricsInNotch ? .white : .white.opacity(0.35))
-                            .frame(width: 24, height: 24)
-                            .contentShape(Rectangle())
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        settings.showLyricsInNotch.toggle()
                     }
-                    .buttonStyle(.plain)
-                    .pointingHandCursor()
-                } else {
-                    Color.clear.frame(width: 24, height: 24)
+                }) {
+                    Image(systemName: "quote.bubble.fill")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundColor(settings.showLyricsInNotch ? .white : .white.opacity(0.35))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
 
                 Spacer()
 

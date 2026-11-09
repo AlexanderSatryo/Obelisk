@@ -79,22 +79,53 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
     }
 
     public nonisolated static func extractAccurateCity(from placemark: CLPlacemark) -> String {
-        if let subAdmin = placemark.subAdministrativeArea, !subAdmin.isEmpty, subAdmin.lowercased() != "jakarta" {
-            return subAdmin.replacingOccurrences(of: "Kota ", with: "")
-        }
-        if let locality = placemark.locality, !locality.isEmpty {
-            if locality.lowercased() == "jakarta" {
-                if let subAdmin = placemark.subAdministrativeArea, !subAdmin.isEmpty, subAdmin.lowercased() != "jakarta" {
-                    return subAdmin.replacingOccurrences(of: "Kota ", with: "")
+        // Check subAdministrativeArea first (e.g. "Kota Administrasi Jakarta Selatan")
+        if let subAdmin = placemark.subAdministrativeArea, !subAdmin.isEmpty {
+            let lower = subAdmin.lowercased()
+            if lower.contains("jakarta selatan") || lower.contains("south jakarta") {
+                return "South Jakarta"
+            } else if lower.contains("jakarta pusat") || lower.contains("central jakarta") {
+                return "Central Jakarta"
+            } else if lower.contains("jakarta barat") || lower.contains("west jakarta") {
+                return "West Jakarta"
+            } else if lower.contains("jakarta timur") || lower.contains("east jakarta") {
+                return "East Jakarta"
+            } else if lower.contains("jakarta utara") || lower.contains("north jakarta") {
+                return "North Jakarta"
+            } else if lower.contains("tangerang selatan") || lower.contains("south tangerang") {
+                return "South Tangerang"
+            } else if lower != "jakarta" {
+                let clean = subAdmin
+                    .replacingOccurrences(of: "Kota Administrasi ", with: "")
+                    .replacingOccurrences(of: "Kota ", with: "")
+                    .replacingOccurrences(of: "Kabupaten ", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !clean.isEmpty {
+                    return clean
                 }
+            }
+        }
+
+        if let locality = placemark.locality, !locality.isEmpty {
+            let lower = locality.lowercased()
+            if lower == "jakarta" || lower.contains("jakarta") {
                 if let subLoc = placemark.subLocality, !subLoc.isEmpty {
+                    let subLower = subLoc.lowercased()
+                    if ["kebayoran", "mampang", "cilandak", "tebet", "pasar minggu", "pancoran", "jagakarsa", "pesanggrahan", "setiabudi"].contains(where: { subLower.contains($0) }) {
+                        return "South Jakarta"
+                    }
                     return "\(subLoc), South Jakarta"
                 }
                 return "South Jakarta"
             }
             return locality
         }
+
         if let subLoc = placemark.subLocality, !subLoc.isEmpty {
+            let subLower = subLoc.lowercased()
+            if ["kebayoran", "mampang", "cilandak", "tebet", "pasar minggu", "pancoran", "jagakarsa", "pesanggrahan", "setiabudi"].contains(where: { subLower.contains($0) }) {
+                return "South Jakarta"
+            }
             return subLoc
         }
         if let admin = placemark.administrativeArea, !admin.isEmpty {
@@ -171,9 +202,31 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
             return
         }
 
-        fetchWeather()
+        // 1. If CoreLocation is active and authorized, request a fresh location fix
+        if let lm = locationManager {
+            let status = lm.authorizationStatus
+            if status == .authorizedAlways || status == .authorized {
+                lm.requestLocation()
+                if let loc = lm.location {
+                    self.lastKnownCoordinate = loc.coordinate
+                    reverseGeocodeAndFetch(location: loc)
+                    return
+                }
+            } else if status == .notDetermined {
+                lm.requestWhenInUseAuthorization()
+            }
+        }
 
-        Task.detached(priority: .userInitiated) {
+        // 2. If we already have a valid coordinate (from device or saved cache), fetch weather for it
+        // and do not let inaccurate IP geolocation overwrite it
+        if lastKnownCoordinate != nil {
+            fetchWeather()
+            return
+        }
+
+        // 3. Fallback: only when no coordinate is available at all, query IP as initial bootstrap
+        fetchWeather()
+        Task.detached(priority: .utility) {
             guard let url = URL(string: "http://ip-api.com/json/?fields=status,city,regionName,lat,lon") else { return }
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
@@ -182,6 +235,7 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
                    let lon = (json["lon"] as? NSNumber)?.doubleValue {
                     let loc = CLLocation(latitude: lat, longitude: lon)
                     await MainActor.run {
+                        guard WeatherService.shared.lastKnownCoordinate == nil else { return }
                         WeatherService.shared.lastKnownCoordinate = loc.coordinate
                         UserDefaults.standard.set(lat, forKey: "weather_lat")
                         UserDefaults.standard.set(lon, forKey: "weather_lon")
@@ -242,8 +296,8 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
             city = lastKnownCity ?? "South Jakarta"
             isDevice = true
         } else {
-            lat = -6.2615
-            lon = 106.8106
+            lat = -6.2366
+            lon = 106.8227
             city = lastKnownCity ?? "South Jakarta"
             isDevice = true
         }
