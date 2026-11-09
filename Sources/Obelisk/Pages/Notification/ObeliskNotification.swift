@@ -12,9 +12,17 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
     public let appIcon: NSImage?
     public let appURL: URL?
     public let groupName: String?
+    public let avatarData: Data?
+
+    public var avatarImage: NSImage? {
+        if let d = avatarData {
+            return NSImage(data: d)
+        }
+        return nil
+    }
 
     enum CodingKeys: String, CodingKey {
-        case id, appName, bundleIdentifier, sender, message, timestamp, groupName
+        case id, appName, bundleIdentifier, sender, message, timestamp, groupName, avatarData
     }
 
     public init(
@@ -26,7 +34,9 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         timestamp: Date = Date(),
         appIcon: NSImage? = nil,
         appURL: URL? = nil,
-        groupName: String? = nil
+        groupName: String? = nil,
+        avatarImage: NSImage? = nil,
+        avatarData: Data? = nil
     ) {
         let cleanAppName = ObeliskNotification.stripBidiControlMarks(appName)
         let cleanSender = ObeliskNotification.stripBidiControlMarks(sender)
@@ -40,6 +50,9 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         self.message = cleanMessage
         self.timestamp = timestamp
         self.groupName = (cleanGroup?.isEmpty == true) ? nil : cleanGroup
+
+        let effectiveAvatarData = avatarData ?? avatarImage?.tiffRepresentation
+        self.avatarData = effectiveAvatarData
 
         let resolvedURL = appURL ?? ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: cleanAppName)
         self.appURL = resolvedURL
@@ -55,6 +68,7 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         let rawMessage = try container.decode(String.self, forKey: .message)
         self.timestamp = try container.decode(Date.self, forKey: .timestamp)
         let rawGroupName = try container.decodeIfPresent(String.self, forKey: .groupName)
+        self.avatarData = try container.decodeIfPresent(Data.self, forKey: .avatarData)
 
         let cleanAppName = ObeliskNotification.stripBidiControlMarks(rawAppName)
         self.appName = cleanAppName
@@ -86,6 +100,7 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         try container.encode(message, forKey: .message)
         try container.encode(timestamp, forKey: .timestamp)
         try container.encodeIfPresent(groupName, forKey: .groupName)
+        try container.encodeIfPresent(avatarData, forKey: .avatarData)
     }
 
     /// Returns the group name (if this is a group chat notification), or nil if it's a 1-on-1 direct message.
@@ -141,7 +156,8 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         lhs.bundleIdentifier == rhs.bundleIdentifier &&
         lhs.sender == rhs.sender &&
         lhs.message == rhs.message &&
-        lhs.groupName == rhs.groupName
+        lhs.groupName == rhs.groupName &&
+        lhs.avatarData == rhs.avatarData
     }
 
     /// Resolves the filesystem URL of the target application on macOS.

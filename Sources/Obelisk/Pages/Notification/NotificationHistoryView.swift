@@ -1,4 +1,5 @@
 import AppKit
+import Contacts
 import SwiftUI
 
 /// Dedicated dashboard page inside the expanded Obelisk notch for browsing and managing recent notifications.
@@ -257,86 +258,125 @@ public struct NotificationHistoryView: View {
 
     @ViewBuilder
     private func avatarWithAppBadgeView(item: ObeliskNotification) -> some View {
-        let hasCustomSender = !item.resolvedSenderName.isEmpty && item.resolvedSenderName != item.appName
         let isGroup = item.resolvedGroupName != nil
+        let hasCustomSender = !item.resolvedSenderName.isEmpty && item.resolvedSenderName != item.appName
+        let avatarSize: CGFloat = 36
+        let badgeSize: CGFloat = 13.5
 
-        if hasCustomSender || isGroup {
-            let avatarSize: CGFloat = 34
-            let badgeSize: CGFloat = 13.5
-
-            ZStack(alignment: .bottomTrailing) {
-                // Circular Avatar with Initials
+        ZStack(alignment: .bottomTrailing) {
+            if let customAvatar = item.avatarImage ?? resolveContactImage(for: item.resolvedSenderName) {
+                // Real Profile Photo (Clipped to Circle)
+                Image(nsImage: customAvatar)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: avatarSize, height: avatarSize)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle().stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                    )
+            } else if isGroup {
+                // MARK: Profil Grup (Apple Group Avatar with person.2.fill)
                 ZStack {
                     Circle()
-                        .fill(avatarBackgroundGradient(for: item.resolvedGroupName ?? item.resolvedSenderName))
+                        .fill(groupAvatarGradient(for: item.resolvedGroupName ?? item.sender))
 
-                    Text(avatarInitials(for: item.resolvedGroupName ?? item.resolvedSenderName))
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white.opacity(0.95))
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 14.5, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.96))
                 }
                 .frame(width: avatarSize, height: avatarSize)
+                .overlay(
+                    Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+                )
+            } else if hasCustomSender {
+                // MARK: Profil Orang (Apple Person Avatar with person.fill)
+                ZStack {
+                    Circle()
+                        .fill(personAvatarGradient(for: item.resolvedSenderName))
 
-                // App Badge (WhatsApp / Mail) on bottom-trailing corner
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.96))
+                }
+                .frame(width: avatarSize, height: avatarSize)
+                .overlay(
+                    Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+                )
+            } else {
+                // MARK: Generic App Icon
                 if let icon = item.appIcon {
                     Image(nsImage: icon)
                         .resizable()
                         .interpolation(.high)
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: badgeSize, height: badgeSize)
-                        .clipShape(RoundedRectangle(cornerRadius: 3.2, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 3.2, style: .continuous)
-                                .stroke(Color(red: 22/255, green: 22/255, blue: 24/255), lineWidth: 1.5)
-                        )
-                        .offset(x: 2.5, y: 2.5)
+                        .frame(width: 26, height: 26)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                } else {
+                    ZStack {
+                        Circle().fill(Color.white.opacity(0.12))
+                        Image(systemName: "bell.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .frame(width: 26, height: 26)
                 }
             }
-            .frame(width: avatarSize + 2, height: avatarSize + 2)
-        } else {
-            // Generic App Icon (e.g. system notification)
-            if let icon = item.appIcon {
+
+            // Official App Badge (pinned to bottom-trailing corner)
+            if (isGroup || hasCustomSender), let icon = item.appIcon {
                 Image(nsImage: icon)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 24, height: 24)
-                    .clipShape(RoundedRectangle(cornerRadius: 5.5, style: .continuous))
-            } else {
-                ZStack {
-                    Circle().fill(Color.white.opacity(0.12))
-                    Image(systemName: "bell.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: 24, height: 24)
+                    .frame(width: badgeSize, height: badgeSize)
+                    .clipShape(RoundedRectangle(cornerRadius: 3.2, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 3.2, style: .continuous)
+                            .stroke(Color(red: 22/255, green: 22/255, blue: 24/255), lineWidth: 1.5)
+                    )
+                    .offset(x: 2.5, y: 2.5)
             }
         }
+        .frame(width: avatarSize + 3, height: avatarSize + 3)
     }
 
-    private func avatarBackgroundGradient(for name: String) -> LinearGradient {
+    private func resolveContactImage(for name: String) -> NSImage? {
+        guard !name.isEmpty else { return nil }
+        if CNContactStore.authorizationStatus(for: .contacts) == .authorized {
+            let store = CNContactStore()
+            let predicate = CNContact.predicateForContacts(matchingName: name)
+            if let list = try? store.unifiedContacts(matching: predicate, keysToFetch: [CNContactThumbnailImageDataKey as CNKeyDescriptor]),
+               let first = list.first(where: { $0.thumbnailImageData != nil }),
+               let data = first.thumbnailImageData {
+                return NSImage(data: data)
+            }
+        }
+        return nil
+    }
+
+    private func groupAvatarGradient(for name: String) -> LinearGradient {
         let hash = abs(name.hashValue)
         let palettes: [[Color]] = [
-            [Color(red: 45/255, green: 110/255, blue: 85/255), Color(red: 30/255, green: 80/255, blue: 60/255)],  // Forest Green
-            [Color(red: 55/255, green: 105/255, blue: 145/255), Color(red: 35/255, green: 75/255, blue: 110/255)], // Slate Teal
-            [Color(red: 135/255, green: 75/255, blue: 115/255), Color(red: 95/255, green: 50/255, blue: 85/255)],  // Soft Plum
-            [Color(red: 155/255, green: 95/255, blue: 55/255), Color(red: 115/255, green: 65/255, blue: 35/255)],  // Warm Ochre
-            [Color(red: 65/255, green: 85/255, blue: 125/255), Color(red: 45/255, green: 60/255, blue: 95/255)]   // Navy Slate
+            [Color(red: 40/255, green: 115/255, blue: 85/255), Color(red: 25/255, green: 80/255, blue: 60/255)],  // WhatsApp Forest Green
+            [Color(red: 45/255, green: 110/255, blue: 120/255), Color(red: 30/255, green: 80/255, blue: 90/255)],  // Emerald Teal
+            [Color(red: 60/255, green: 100/255, blue: 130/255), Color(red: 40/255, green: 75/255, blue: 105/255)], // Deep Pine
+            [Color(red: 50/255, green: 120/255, blue: 110/255), Color(red: 30/255, green: 85/255, blue: 80/255)]   // Sage Seafoam
         ]
         let colors = palettes[hash % palettes.count]
         return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
-    private func avatarInitials(for name: String) -> String {
-        let parts = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            .components(separatedBy: .whitespaces)
-            .filter { !$0.isEmpty }
-        if parts.count >= 2 {
-            let first = parts[0].prefix(1)
-            let second = parts[1].prefix(1)
-            return "\(first)\(second)".uppercased()
-        } else if let first = parts.first, !first.isEmpty {
-            return String(first.prefix(2)).uppercased()
-        }
-        return "•"
+    private func personAvatarGradient(for name: String) -> LinearGradient {
+        let hash = abs(name.hashValue)
+        let palettes: [[Color]] = [
+            [Color(red: 60/255, green: 115/255, blue: 165/255), Color(red: 40/255, green: 85/255, blue: 135/255)], // Classic Apple Blue
+            [Color(red: 135/255, green: 80/255, blue: 135/255), Color(red: 95/255, green: 55/255, blue: 100/255)],  // Orchid Violet
+            [Color(red: 165/255, green: 95/255, blue: 65/255), Color(red: 125/255, green: 65/255, blue: 40/255)],  // Warm Ochre
+            [Color(red: 85/255, green: 95/255, blue: 135/255), Color(red: 55/255, green: 65/255, blue: 105/255)],  // Slate Indigo
+            [Color(red: 155/255, green: 75/255, blue: 85/255), Color(red: 115/255, green: 50/255, blue: 60/255)]   // Muted Rose
+        ]
+        let colors = palettes[hash % palettes.count]
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 }
