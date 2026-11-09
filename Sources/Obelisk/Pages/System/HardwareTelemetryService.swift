@@ -53,6 +53,7 @@ public final class HardwareTelemetryService: ObservableObject {
     private var powerRunLoopSource: CFRunLoopSource?
     private var previousCPUTicks: [Int32] = []
     private var hasInitializedPowerState: Bool = false
+    private var hasNotifiedFullyCharged: Bool = false
     private var lastLowBatteryAlertLevel: Int = 100
     private var hudDismissWorkItem: DispatchWorkItem?
 
@@ -298,6 +299,17 @@ public final class HardwareTelemetryService: ObservableObject {
 
     // MARK: - Battery & MagSafe Power State via IOKit
 
+    public func triggerBatteryFullyChargedHUD() {
+        triggerTransientHUD(
+            .battery(
+                percentage: 100,
+                isCharging: false,
+                statusText: "Fully Charged"
+            ),
+            duration: 4.5
+        )
+    }
+
     private func updateBatteryMetrics(isInitial: Bool) {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
@@ -358,10 +370,20 @@ public final class HardwareTelemetryService: ObservableObject {
         self.timeRemainingMinutes = timeMins
         self.batteryStatusText = statusStr
 
+        let isChargedNow = pluggedIn && (pct >= 100 || (desc[kIOPSIsChargedKey as String] as? Bool) == true)
+
+        if !pluggedIn || pct < 98 {
+            self.hasNotifiedFullyCharged = false
+        }
+
         if hasInitializedPowerState && !isInitial {
-            if pluggedIn != previousPluggedIn || charging != previousCharging {
+            if isChargedNow && !hasNotifiedFullyCharged && ObeliskSettings.shared.notifyBatteryFullyCharged {
+                self.hasNotifiedFullyCharged = true
+                triggerBatteryFullyChargedHUD()
+            } else if pluggedIn != previousPluggedIn || charging != previousCharging {
                 if previousPluggedIn && !pluggedIn {
                     self.lastChargerDisconnectionTime = Date()
+                    self.hasNotifiedFullyCharged = false
                     triggerTransientHUD(
                         .battery(
                             percentage: pct,
@@ -372,14 +394,19 @@ public final class HardwareTelemetryService: ObservableObject {
                     )
                 } else if pluggedIn {
                     self.lastChargerConnectionTime = Date()
-                    triggerTransientHUD(
-                        .battery(
-                            percentage: pct,
-                            isCharging: true,
-                            statusText: statusStr
-                        ),
-                        duration: 3.6
-                    )
+                    if isChargedNow && ObeliskSettings.shared.notifyBatteryFullyCharged {
+                        self.hasNotifiedFullyCharged = true
+                        triggerBatteryFullyChargedHUD()
+                    } else {
+                        triggerTransientHUD(
+                            .battery(
+                                percentage: pct,
+                                isCharging: true,
+                                statusText: statusStr
+                            ),
+                            duration: 3.6
+                        )
+                    }
                 }
             } else if !pluggedIn && pct <= 20 && lastLowBatteryAlertLevel > 20 {
                 triggerTransientHUD(

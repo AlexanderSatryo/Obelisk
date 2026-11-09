@@ -180,6 +180,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DistributedNotificationCenter.default().addObserver(
             self,
+            selector: #selector(testBatteryFullyChargedHUD),
+            name: Notification.Name("com.obelisk.testBatteryFullyChargedHUD"),
+            object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
             selector: #selector(testVolumeHUD),
             name: Notification.Name("com.obelisk.testVolumeHUD"),
             object: nil
@@ -364,6 +371,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 ),
                 duration: 4.0
             )
+        }
+    }
+
+    @objc private func testBatteryFullyChargedHUD() {
+        Task { @MainActor in
+            HardwareTelemetryService.shared.triggerBatteryFullyChargedHUD()
         }
     }
 

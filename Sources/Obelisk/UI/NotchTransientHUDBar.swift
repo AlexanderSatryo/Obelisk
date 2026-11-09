@@ -45,6 +45,9 @@ public struct NotchTransientHUDBar: View {
             let sym = (icon == "download") ? "arrow.down.circle" : ((icon == "focus") ? "moon" : icon)
             return (sym, .white.opacity(0.55))
         case .battery(let pct, let isCharging, let statusText):
+            if statusText == "Fully Charged" || statusText.contains("Fully Charged") {
+                return ("checkmark.circle.fill", calmSageGreen)
+            }
             if isCharging { return ("bolt.fill", calmSageGreen) }
             if statusText == "Disconnected" || statusText == "Unplugged" { return ("powerplug", calmWarmAmber) }
             return (pct <= 20 ? "battery.25" : "battery.100", pct <= 20 ? calmWarmAmber : calmSageGreen)
@@ -82,6 +85,7 @@ public struct NotchTransientHUDBar: View {
         case .deviceConnected(let name, _, _), .deviceDisconnected(let name, _, _):
             return name
         case .battery(let pct, let isCharging, let statusText):
+            if statusText == "Fully Charged" || statusText.contains("Fully Charged") { return "Fully Charged" }
             if isCharging { return "Charging" }
             if statusText == "Disconnected" || statusText == "Unplugged" { return "Power Disconnected" }
             return pct <= 20 ? "Low Battery" : "Battery"
@@ -101,6 +105,9 @@ public struct NotchTransientHUDBar: View {
         case .deviceConnected(_, _, let status), .deviceDisconnected(_, _, let status):
             return status
         case .battery(_, let isCharging, let statusText):
+            if statusText == "Fully Charged" || statusText.contains("Fully Charged") {
+                return "Battery at 100% • Safe to unplug"
+            }
             if isCharging { return "Power Adapter Connected" }
             if statusText == "Disconnected" || statusText == "Unplugged" { return "Running on Battery" }
             return statusText
@@ -157,24 +164,41 @@ public struct NotchTransientHUDBar: View {
                 }
             }
         case .battery(let pct, let isCharging, let statusText):
-            VStack(alignment: .trailing, spacing: 5) {
-                HStack(spacing: 4) {
-                    if isCharging {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 11, weight: .bold))
+            if statusText == "Fully Charged" || statusText.contains("Fully Charged") {
+                VStack(alignment: .trailing, spacing: 3) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundColor(calmSageGreen)
+                        Text("100%")
+                            .font(.system(size: 15, weight: .bold))
+                            .monospacedDigit()
+                            .foregroundColor(.white)
                     }
-                    Text(statusText.contains("•") ? statusText : "\(pct)% • \(statusText)")
-                        .font(.system(size: 13, weight: .semibold, design: .default))
-                        .foregroundColor(isCharging ? calmSageGreen : (pct <= 20 ? calmWarmAmber : .white))
+                    Text("Complete")
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundColor(calmSageGreen)
                 }
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.14))
-                    Capsule()
-                        .fill(isCharging ? calmSageGreen : (pct <= 20 ? calmWarmAmber : Color.white.opacity(0.8)))
-                        .frame(width: 76 * CGFloat(max(0, min(100, pct))) / 100.0)
+            } else {
+                VStack(alignment: .trailing, spacing: 5) {
+                    HStack(spacing: 4) {
+                        if isCharging {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(calmSageGreen)
+                        }
+                        Text(statusText.contains("•") ? statusText : "\(pct)% • \(statusText)")
+                            .font(.system(size: 13, weight: .semibold, design: .default))
+                            .foregroundColor(isCharging ? calmSageGreen : (pct <= 20 ? calmWarmAmber : .white))
+                    }
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.14))
+                        Capsule()
+                            .fill(isCharging ? calmSageGreen : (pct <= 20 ? calmWarmAmber : Color.white.opacity(0.8)))
+                            .frame(width: 76 * CGFloat(max(0, min(100, pct))) / 100.0)
+                    }
+                    .frame(width: 76, height: 4)
                 }
-                .frame(width: 76, height: 4)
             }
         case .volume(let level, let isMuted):
             VStack(alignment: .trailing, spacing: 5) {
@@ -323,18 +347,29 @@ public struct NotchTransientHUDBar: View {
 
         case .battery(let pct, let isCharging, let statusText):
             HStack(spacing: 7) {
-                BatteryPillBadge(percentage: pct, isCharging: isCharging)
+                if statusText == "Fully Charged" || statusText.contains("Fully Charged") {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(calmSageGreen)
 
-                let title: String = {
-                    if isCharging { return "Charging" }
-                    if statusText == "Disconnected" || statusText == "Unplugged" { return "Disconnected" }
-                    return pct <= 20 ? "Low Battery" : "Battery"
-                }()
+                    Text("Fully Charged")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                } else {
+                    BatteryPillBadge(percentage: pct, isCharging: isCharging)
 
-                Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
+                    let title: String = {
+                        if isCharging { return "Charging" }
+                        if statusText == "Disconnected" || statusText == "Unplugged" { return "Disconnected" }
+                        return pct <= 20 ? "Low Battery" : "Battery"
+                    }()
+
+                    Text(title)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
             }
 
         case .deviceConnected(let name, let icon, _):
@@ -455,22 +490,40 @@ public struct NotchTransientHUDBar: View {
             }
 
         case .battery(let pct, let isCharging, let statusText):
-            HStack(spacing: 4) {
-                Text("\(pct)%")
-                    .font(.system(size: 11, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundColor(isCharging ? calmSageGreen : (pct <= 20 ? calmWarmAmber : .white))
+            if statusText == "Fully Charged" || statusText.contains("Fully Charged") {
+                HStack(spacing: 5) {
+                    Text("100%")
+                        .font(.system(size: 11, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundColor(calmSageGreen)
 
-                let cleanSub = extractBatterySubtitle(statusText, pct: pct, isCharging: isCharging)
-                if !cleanSub.isEmpty {
                     Text("•")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundColor(.white.opacity(0.4))
 
-                    Text(cleanSub)
+                    Text("Unplug Charger")
                         .font(.system(size: 10.5, weight: .medium))
-                        .foregroundColor(.white.opacity(0.75))
+                        .foregroundColor(.white.opacity(0.85))
                         .lineLimit(1)
+                }
+            } else {
+                HStack(spacing: 4) {
+                    Text("\(pct)%")
+                        .font(.system(size: 11, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundColor(isCharging ? calmSageGreen : (pct <= 20 ? calmWarmAmber : .white))
+
+                    let cleanSub = extractBatterySubtitle(statusText, pct: pct, isCharging: isCharging)
+                    if !cleanSub.isEmpty {
+                        Text("•")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.4))
+
+                        Text(cleanSub)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(1)
+                    }
                 }
             }
 
