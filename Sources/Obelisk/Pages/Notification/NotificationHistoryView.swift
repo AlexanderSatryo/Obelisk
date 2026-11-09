@@ -156,7 +156,7 @@ public struct NotificationHistoryView: View {
     private func notificationRow(_ item: ObeliskNotification) -> some View {
         let isHovered = hoveredNotificationId == item.id
 
-        return HStack(spacing: 8) {
+        return HStack(alignment: .top, spacing: 8) {
             // App Icon
             if let icon = item.appIcon {
                 Image(nsImage: icon)
@@ -165,6 +165,7 @@ public struct NotificationHistoryView: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 20, height: 20)
                     .clipShape(RoundedRectangle(cornerRadius: 4.5, style: .continuous))
+                    .padding(.top, 1.5)
             } else {
                 ZStack {
                     Circle().fill(Color.white.opacity(0.12))
@@ -173,18 +174,20 @@ public struct NotificationHistoryView: View {
                         .foregroundColor(.white)
                 }
                 .frame(width: 20, height: 20)
+                .padding(.top, 1.5)
             }
 
             // Notification Info
-            VStack(alignment: .leading, spacing: 1.5) {
+            VStack(alignment: .leading, spacing: 2) {
+                // Header Bar: App Name • Time
                 HStack(spacing: 4) {
                     Text(item.appName)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.9))
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.6))
 
                     Text("•")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.white.opacity(0.35))
+                        .font(.system(size: 7.5, weight: .bold))
+                        .foregroundColor(.white.opacity(0.3))
 
                     Text(item.formattedTimeAgo)
                         .font(.system(size: 9.5, weight: .medium))
@@ -193,23 +196,28 @@ public struct NotificationHistoryView: View {
                     Spacer()
                 }
 
-                HStack(spacing: 4) {
-                    if !item.sender.isEmpty {
-                        Text(item.sender + ":")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(.white)
-                    }
+                // Group / Sender Name: spans full horizontal width first, then wraps below cleanly
+                if !item.sender.isEmpty && item.sender != item.appName {
+                    Text(item.sender)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
+                // Chat Message Body: placed directly underneath
+                if !item.message.isEmpty {
                     Text(item.message)
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundColor(.white.opacity(0.72))
-                        .lineLimit(1)
-
-                    Spacer(minLength: 4)
+                        .font(.system(size: 10.5, weight: .regular))
+                        .foregroundColor(.white.opacity(0.75))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
-            // Quick Actions
+            // Quick Actions (pinned to top-right)
             HStack(spacing: 6) {
                 Button(action: {
                     notificationService.openNotificationApp(item)
@@ -235,9 +243,11 @@ public struct NotificationHistoryView: View {
                 .buttonStyle(.plain)
                 .pointingHandCursor()
             }
+            .fixedSize()
+            .padding(.top, 1.5)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.white.opacity(isHovered ? 0.08 : 0.03))
