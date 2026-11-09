@@ -226,6 +226,80 @@ public enum StandbyHUDStyle: String, CaseIterable, Identifiable, Equatable {
     }
 }
 
+/// Defines categories for filtering which Mac notifications appear in the notch Dynamic Island.
+public enum NotificationFilterCategory: String, CaseIterable, Identifiable, Codable {
+    case all = "all"
+    case socialMedia = "socialMedia"
+    case entertainment = "entertainment"
+    case productivity = "productivity"
+    case developer = "developer"
+    case systemAndOther = "systemAndOther"
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .all:
+            return "All Notifications"
+        case .socialMedia:
+            return "Social & Messaging"
+        case .entertainment:
+            return "Entertainment & Media"
+        case .productivity:
+            return "Productivity & Work"
+        case .developer:
+            return "Developer & Tools"
+        case .systemAndOther:
+            return "System & Utilities"
+        }
+    }
+
+    public var shortTitle: String {
+        switch self {
+        case .all:
+            return "All"
+        case .socialMedia:
+            return "Social"
+        case .entertainment:
+            return "Entertainment"
+        case .productivity:
+            return "Productivity"
+        case .developer:
+            return "Developer"
+        case .systemAndOther:
+            return "System"
+        }
+    }
+
+    public var subtitle: String {
+        switch self {
+        case .all:
+            return "Show alerts from all configured Mac applications"
+        case .socialMedia:
+            return "WhatsApp, Telegram, Discord, Messages, Slack, X, Instagram"
+        case .entertainment:
+            return "Spotify, Apple Music, YouTube, Netflix, TV, Podcasts"
+        case .productivity:
+            return "Mail, Calendar, Reminders, Notes, Notion, Teams"
+        case .developer:
+            return "Xcode, Terminal, VS Code, Cursor, GitHub, Docker"
+        case .systemAndOther:
+            return "macOS System Alerts, Finder, Battery, and Downloads"
+        }
+    }
+
+    public var iconName: String {
+        switch self {
+        case .all: return "bell.badge.fill"
+        case .socialMedia: return "bubble.left.and.bubble.right.fill"
+        case .entertainment: return "play.tv.fill"
+        case .productivity: return "checklist"
+        case .developer: return "hammer.fill"
+        case .systemAndOther: return "gearshape.2.fill"
+        }
+    }
+}
+
 // MARK: - Behavior & Gesture Enums
 
 /// Determines which pointer actions expand the notch.
@@ -426,6 +500,7 @@ public struct ObeliskSettingsDraft: Equatable {
     public var enableNotificationTab: Bool = true
     public var showDownloadsOnStandby: Bool = true
     public var enableNotifications: Bool = true
+    public var notificationFilterCategory: NotificationFilterCategory = .all
     public var requireTouchIDForNotifications: Bool = true
     public var notificationAutoDismissSeconds: Double = 10.0
     public var enableSystemTab: Bool {
@@ -532,6 +607,7 @@ public struct ObeliskSettingsDraft: Equatable {
             self.autoClearAfterAirDrop = def.autoClearAfterAirDrop
             self.showCalendarEventDots = def.showCalendarEventDots
             self.enableNotifications = def.enableNotifications
+            self.notificationFilterCategory = def.notificationFilterCategory
             self.requireTouchIDForNotifications = def.requireTouchIDForNotifications
             self.notificationAutoDismissSeconds = def.notificationAutoDismissSeconds
 
@@ -747,6 +823,9 @@ public final class ObeliskSettings: ObservableObject {
     @Published public var enableNotifications: Bool {
         didSet { defaults.set(enableNotifications, forKey: "cfg_enableNotifications") }
     }
+    @Published public var notificationFilterCategory: NotificationFilterCategory {
+        didSet { defaults.set(notificationFilterCategory.rawValue, forKey: "cfg_notificationFilterCategory") }
+    }
     @Published public var requireTouchIDForNotifications: Bool {
         didSet { defaults.set(requireTouchIDForNotifications, forKey: "cfg_requireTouchIDForNotifications") }
     }
@@ -891,6 +970,8 @@ public final class ObeliskSettings: ObservableObject {
         self.enableNotificationTab = defaults.object(forKey: "cfg_enableNotificationTab") as? Bool ?? true
         self.showDownloadsOnStandby = defaults.object(forKey: "cfg_showDownloadsOnStandby") as? Bool ?? true
         self.enableNotifications = defaults.object(forKey: "cfg_enableNotifications") as? Bool ?? true
+        let savedFilter = defaults.string(forKey: "cfg_notificationFilterCategory") ?? ""
+        self.notificationFilterCategory = NotificationFilterCategory(rawValue: savedFilter) ?? .all
         self.requireTouchIDForNotifications = defaults.object(forKey: "cfg_requireTouchIDForNotifications") as? Bool ?? true
         self.notificationAutoDismissSeconds = defaults.object(forKey: "cfg_notificationAutoDismissSeconds") as? Double ?? 10.0
         let savedDefaultTabRaw = defaults.string(forKey: "cfg_defaultOpeningTab") ?? ""
@@ -968,6 +1049,7 @@ public final class ObeliskSettings: ObservableObject {
         d.enableNotificationTab = enableNotificationTab
         d.showDownloadsOnStandby = showDownloadsOnStandby
         d.enableNotifications = enableNotifications
+        d.notificationFilterCategory = notificationFilterCategory
         d.requireTouchIDForNotifications = requireTouchIDForNotifications
         d.notificationAutoDismissSeconds = notificationAutoDismissSeconds
         d.defaultOpeningTab = defaultOpeningTab
@@ -1038,6 +1120,7 @@ public final class ObeliskSettings: ObservableObject {
         enableNotificationTab = draft.enableNotificationTab
         showDownloadsOnStandby = draft.showDownloadsOnStandby
         enableNotifications = draft.enableNotifications
+        notificationFilterCategory = draft.notificationFilterCategory
         requireTouchIDForNotifications = draft.requireTouchIDForNotifications
         notificationAutoDismissSeconds = draft.notificationAutoDismissSeconds
         defaultOpeningTab = draft.defaultOpeningTab

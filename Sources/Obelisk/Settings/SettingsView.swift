@@ -126,7 +126,7 @@ public enum SettingsSearchIndex {
         SettingsSearchItem(id: "autoClearAfterAirDrop", title: "Auto-Clear After AirDrop", category: .modules, keywords: ["auto-clear", "clear after airdrop", "automatic clear", "empty shelf"]),
         SettingsSearchItem(id: "calendarEventDots", title: "Calendar Event Indicators", category: .modules, keywords: ["calendar event", "event dots", "event indicators", "agenda markers", "event badge"]),
         SettingsSearchItem(id: "downloads", title: "Live Downloads & Task Progress", category: .modules, keywords: ["download", "downloads", "progress", "live activities", "download progress", "crdownload", "task progress"]),
-        SettingsSearchItem(id: "notifications", title: "Dynamic Island Notifications & Touch ID", category: .modules, keywords: ["notification", "notifications", "touch id", "face id", "biometrics", "privacy", "whatsapp", "mail", "telegram", "messages", "dynamic island notifications", "lock"]),
+        SettingsSearchItem(id: "notifications", title: "Dynamic Island Notifications & Touch ID", category: .modules, keywords: ["notification", "notifications", "touch id", "face id", "biometrics", "privacy", "whatsapp", "mail", "telegram", "messages", "dynamic island notifications", "lock", "filter", "category", "entertainment", "social media", "productivity"]),
 
         // Media & Lyrics
         SettingsSearchItem(id: "lyrics", title: "Synchronized Lyrics", category: .media, keywords: ["synchronized lyrics", "lyrics", "live lyrics", "synced lyrics", "auto-expand lyrics"]),
@@ -1032,12 +1032,24 @@ public struct SettingsView: View {
                 ) {
                     PreferenceToggleRow(
                         title: "Notifications HUD",
-                        subtitle: "Displays incoming alerts and messages in the Dynamic Island wings",
+                        subtitle: "Enable or disable incoming alert popups in the Dynamic Island notch",
                         isHighlighted: matchesCurrentQuery("notifications"),
                         isOn: $draft.enableNotifications
                     )
 
                     if draft.enableNotifications {
+                        PreferenceRow(
+                            title: "Notification Category",
+                            subtitle: "Select which category of alerts appear in the notch",
+                            isHighlighted: matchesCurrentQuery("notifications")
+                        ) {
+                            ModernMenuPicker(
+                                selection: $draft.notificationFilterCategory,
+                                options: NotificationFilterCategory.allCases.map { ($0, $0.title) },
+                                width: 200
+                            )
+                        }
+
                         PreferenceToggleRow(
                             title: "Require Touch ID for Details",
                             subtitle: "Hides sender and message content behind biometrics verification",

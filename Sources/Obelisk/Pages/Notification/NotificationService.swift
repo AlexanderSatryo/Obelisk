@@ -49,6 +49,18 @@ public final class NotificationService: ObservableObject {
     public func postNotification(_ notification: ObeliskNotification) {
         guard ObeliskSettings.shared.enableNotifications else { return }
 
+        // Always archive into recent notifications history
+        recentNotifications.removeAll { $0.id == notification.id }
+        recentNotifications.insert(notification, at: 0)
+        if recentNotifications.count > 30 {
+            recentNotifications = Array(recentNotifications.prefix(30))
+        }
+        saveRecentNotifications()
+
+        // Check if incoming notification passes the selected category filter for the notch HUD
+        let currentFilter = ObeliskSettings.shared.notificationFilterCategory
+        guard notification.matches(filter: currentFilter) else { return }
+
         // Immediately dismiss any active transient volume/brightness HUD so the incoming notification
         // appears in the standby notch instantly without waiting for the volume notification to finish
         HardwareTelemetryService.shared.dismissTransientHUD(animated: false)
@@ -60,14 +72,6 @@ public final class NotificationService: ObservableObject {
         if !WindowManager.shared.isExpanded {
             BiometricPrivacyService.shared.lock()
         }
-
-        // Archive into recent notifications history
-        recentNotifications.removeAll { $0.id == notification.id }
-        recentNotifications.insert(notification, at: 0)
-        if recentNotifications.count > 30 {
-            recentNotifications = Array(recentNotifications.prefix(30))
-        }
-        saveRecentNotifications()
 
         withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
             self.activeNotification = notification

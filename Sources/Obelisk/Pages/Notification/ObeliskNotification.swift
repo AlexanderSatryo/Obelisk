@@ -160,6 +160,77 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         lhs.avatarData == rhs.avatarData
     }
 
+    // MARK: - Smart Notification Category Classifier
+
+    public var category: NotificationFilterCategory {
+        let lowerBundle = bundleIdentifier.lowercased()
+        let lowerApp = appName.lowercased()
+
+        // 1. Check LSApplicationCategoryType from app bundle
+        if let url = appURL, let bundle = Bundle(url: url),
+           let catType = bundle.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String {
+            let cat = catType.lowercased()
+            if cat.contains("social") || cat.contains("news") {
+                return .socialMedia
+            } else if cat.contains("music") || cat.contains("entertainment") || cat.contains("video") || cat.contains("games") {
+                return .entertainment
+            } else if cat.contains("productivity") || cat.contains("business") || cat.contains("finance") {
+                return .productivity
+            } else if cat.contains("developer") {
+                return .developer
+            }
+        }
+
+        // 2. Social & Messaging Apps
+        let socialKeywords = [
+            "whatsapp", "telegram", "discord", "slack", "messages", "signal",
+            "wechat", "line", "instagram", "twitter", "tweet", "mastodon", "bluesky",
+            "messenger", "facebook", "viber", "skype", "element", "matrix"
+        ]
+        if socialKeywords.contains(where: { lowerBundle.contains($0) || lowerApp.contains($0) }) {
+            return .socialMedia
+        }
+
+        // 3. Entertainment & Media Apps
+        let entertainmentKeywords = [
+            "spotify", "music", "youtube", "netflix", "tv", "podcast",
+            "twitch", "vidio", "tiktok", "vlc", "iina", "quicktime",
+            "soundcloud", "hulu", "disney", "primevideo", "steam"
+        ]
+        if entertainmentKeywords.contains(where: { lowerBundle.contains($0) || lowerApp.contains($0) }) {
+            return .entertainment
+        }
+
+        // 4. Productivity & Work Apps
+        let productivityKeywords = [
+            "mail", "calendar", "reminder", "notes", "notion", "trello",
+            "asana", "linear", "jira", "confluence", "teams", "zoom",
+            "docs", "sheets", "slides", "word", "excel", "powerpoint",
+            "outlook", "onenote", "craft", "bear", "obsidian", "todoist", "things"
+        ]
+        if productivityKeywords.contains(where: { lowerBundle.contains($0) || lowerApp.contains($0) }) {
+            return .productivity
+        }
+
+        // 5. Developer Tools & Code Editors
+        let developerKeywords = [
+            "xcode", "terminal", "iterm", "vscode", "visual studio", "cursor",
+            "sublime", "intellij", "pycharm", "webstorm", "git", "github",
+            "gitlab", "docker", "postman", "simulator", "android"
+        ]
+        if developerKeywords.contains(where: { lowerBundle.contains($0) || lowerApp.contains($0) }) {
+            return .developer
+        }
+
+        return .systemAndOther
+    }
+
+    /// Checks if this notification matches the user's selected category filter.
+    public func matches(filter: NotificationFilterCategory) -> Bool {
+        if filter == .all { return true }
+        return self.category == filter
+    }
+
     /// Resolves the filesystem URL of the target application on macOS.
     public static func resolveAppURL(bundleIdentifier: String, appName: String) -> URL? {
         if !bundleIdentifier.isEmpty,

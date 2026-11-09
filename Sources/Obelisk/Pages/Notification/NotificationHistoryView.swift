@@ -17,11 +17,19 @@ public struct NotificationHistoryView: View {
         settings.requireTouchIDForNotifications && !biometrics.isUnlocked
     }
 
+    private var displayedNotifications: [ObeliskNotification] {
+        notificationService.recentNotifications.filter {
+            $0.matches(filter: settings.notificationFilterCategory)
+        }
+    }
+
     public var body: some View {
         VStack(spacing: 6) {
             if isLocked {
                 lockedPrivacyView
-            } else if notificationService.recentNotifications.isEmpty {
+            } else if !settings.enableNotifications {
+                disabledNotificationsView
+            } else if displayedNotifications.isEmpty {
                 emptyStateView
             } else {
                 recentFeedView
@@ -91,22 +99,70 @@ public struct NotificationHistoryView: View {
         }
     }
 
+    // MARK: - Disabled State
+
+    private var disabledNotificationsView: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 34, height: 34)
+                Image(systemName: "bell.slash.fill")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.40))
+            }
+
+            VStack(spacing: 2) {
+                Text("Notifications are Turned Off")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.88))
+
+                Text("Enable Notifications HUD in Settings to receive alerts in the notch.")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundColor(.white.opacity(0.50))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+
+            Button(action: {
+                SettingsWindowManager.shared.showSettings()
+                windowManager.collapse()
+            }) {
+                Text("Open Settings")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3.5)
+                    .background(
+                        Capsule().fill(Color.white.opacity(0.12))
+                    )
+            }
+            .buttonStyle(.plain)
+            .pointingHandCursor()
+            .padding(.top, 1)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     // MARK: - Empty State
 
     private var emptyStateView: some View {
         VStack(spacing: 7) {
-            Image(systemName: "bell.slash")
+            Image(systemName: settings.notificationFilterCategory == .all ? "bell.slash" : settings.notificationFilterCategory.iconName)
                 .font(.system(size: 24, weight: .light))
                 .foregroundColor(.white.opacity(0.35))
 
             VStack(spacing: 2) {
-                Text("No Recent Notifications")
+                Text(settings.notificationFilterCategory == .all ? "No Recent Notifications" : "No \(settings.notificationFilterCategory.title)")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.white.opacity(0.85))
 
-                Text("Notifications from WhatsApp, Mail, and other applications will appear here.")
+                Text(settings.notificationFilterCategory == .all
+                    ? "Notifications from WhatsApp, Mail, and other applications will appear here."
+                    : "No alerts matching \(settings.notificationFilterCategory.title) were found.")
                     .font(.system(size: 10.5, weight: .regular))
                     .foregroundColor(.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -116,11 +172,42 @@ public struct NotificationHistoryView: View {
 
     private var recentFeedView: some View {
         VStack(spacing: 5) {
-            // Header Bar with Quick Actions
+            // Header Bar with Quick Category Filter & Actions
             HStack(spacing: 6) {
-                Text("Recent")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.9))
+                Menu {
+                    ForEach(NotificationFilterCategory.allCases) { cat in
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                settings.notificationFilterCategory = cat
+                            }
+                        }) {
+                            HStack {
+                                Text(cat.title)
+                                if settings.notificationFilterCategory == cat {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(settings.notificationFilterCategory == .all ? "Recent" : settings.notificationFilterCategory.shortTitle)
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.92))
+
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.40))
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .pointingHandCursor()
+
+                if settings.notificationFilterCategory != .all {
+                    Text("(\(displayedNotifications.count))")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.45))
+                }
 
                 Spacer()
 
@@ -143,7 +230,7 @@ public struct NotificationHistoryView: View {
             // Scrollable Recent Notifications List with Smooth Inertia & Overlay Scroller
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 5) {
-                    ForEach(notificationService.recentNotifications) { item in
+                    ForEach(displayedNotifications) { item in
                         notificationRow(item)
                     }
                 }
