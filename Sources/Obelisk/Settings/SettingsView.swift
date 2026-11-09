@@ -158,6 +158,7 @@ public struct SettingsView: View {
     @ObservedObject var weatherService: WeatherService = .shared
 
     @State private var draft: ObeliskSettingsDraft = ObeliskSettings.shared.makeDraft()
+    @State private var savedSnapshot: ObeliskSettingsDraft = ObeliskSettings.shared.makeDraft()
     @State private var selectedCategory: SettingsCategory = .appearance
     @State private var searchText: String = ""
     @FocusState private var isSearchFocused: Bool
@@ -282,16 +283,14 @@ public struct SettingsView: View {
         .background(Color(red: 16/255, green: 16/255, blue: 18/255))
         .preferredColorScheme(.dark)
         .onAppear {
-            draft = settings.makeDraft()
+            let initial = settings.makeDraft()
+            draft = initial
+            savedSnapshot = initial
             hasUnsavedChanges = false
             isSearchFocused = false
         }
         .onChange(of: draft) { newDraft in
-            hasUnsavedChanges = (newDraft != settings.makeDraft())
-        }
-        .onChange(of: draft.compactWidthOffset) { newOffset in
-            settings.compactWidthOffset = newOffset
-            WindowManager.shared.updateCompactWidth(animated: true)
+            hasUnsavedChanges = (newDraft != savedSnapshot)
         }
         .onChange(of: searchText) { newQuery in
             let q = newQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -498,7 +497,7 @@ public struct SettingsView: View {
             if hasUnsavedChanges {
                 ModernButton(title: "Discard", icon: "xmark") {
                     withAnimation(.easeInOut(duration: 0.15)) {
-                        draft = settings.makeDraft()
+                        draft = savedSnapshot
                         hasUnsavedChanges = false
                     }
                 }
@@ -510,7 +509,6 @@ public struct SettingsView: View {
                 isProminent: true
             ) {
                 saveSettings()
-                hasUnsavedChanges = false
             }
             .disabled(!hasUnsavedChanges && !showSavedMessage)
             .opacity(!hasUnsavedChanges && !showSavedMessage ? 0.45 : 1.0)
@@ -522,6 +520,8 @@ public struct SettingsView: View {
 
     private func saveSettings() {
         settings.apply(draft: draft)
+        savedSnapshot = settings.makeDraft()
+        hasUnsavedChanges = false
         withAnimation(.easeInOut(duration: 0.2)) {
             showSavedMessage = true
         }
