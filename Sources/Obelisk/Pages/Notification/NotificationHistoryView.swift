@@ -353,7 +353,9 @@ public struct NotificationHistoryView: View {
         let badgeSize: CGFloat = 13.5
 
         ZStack(alignment: .bottomTrailing) {
-            if let customAvatar = item.avatarImage ?? resolveContactImage(for: item.resolvedSenderName) {
+            if let customAvatar = item.avatarImage
+                ?? (isGroup ? resolveContactImage(for: item.resolvedGroupName ?? "") : nil)
+                ?? resolveContactImage(for: item.resolvedSenderName) {
                 // Real Profile Photo (Clipped to Circle)
                 Image(nsImage: customAvatar)
                     .resizable()

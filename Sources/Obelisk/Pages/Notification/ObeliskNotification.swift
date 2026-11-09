@@ -39,17 +39,21 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         avatarData: Data? = nil
     ) {
         let cleanAppName = ObeliskNotification.stripBidiControlMarks(appName)
-        let cleanSender = ObeliskNotification.stripBidiControlMarks(sender)
-        let cleanMessage = ObeliskNotification.stripBidiControlMarks(message)
-        let cleanGroup = groupName.map { ObeliskNotification.stripBidiControlMarks($0) }
+        let parsed = ObeliskNotification.parseSenderAndGroup(
+            appName: cleanAppName,
+            bundleIdentifier: bundleIdentifier,
+            rawSender: sender,
+            rawGroup: groupName,
+            rawMessage: message
+        )
 
         self.id = id
         self.appName = cleanAppName
         self.bundleIdentifier = bundleIdentifier
-        self.sender = cleanSender
-        self.message = cleanMessage
+        self.sender = parsed.sender
+        self.groupName = parsed.group
+        self.message = parsed.message
         self.timestamp = timestamp
-        self.groupName = (cleanGroup?.isEmpty == true) ? nil : cleanGroup
 
         let effectiveAvatarData = avatarData ?? avatarImage?.tiffRepresentation
         self.avatarData = effectiveAvatarData
@@ -71,10 +75,18 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         self.avatarData = try container.decodeIfPresent(Data.self, forKey: .avatarData)
 
         let cleanAppName = ObeliskNotification.stripBidiControlMarks(rawAppName)
+        let parsed = ObeliskNotification.parseSenderAndGroup(
+            appName: cleanAppName,
+            bundleIdentifier: bundleIdentifier,
+            rawSender: rawSender,
+            rawGroup: rawGroupName,
+            rawMessage: rawMessage
+        )
+
         self.appName = cleanAppName
-        self.sender = ObeliskNotification.stripBidiControlMarks(rawSender)
-        self.message = ObeliskNotification.stripBidiControlMarks(rawMessage)
-        self.groupName = rawGroupName.map { ObeliskNotification.stripBidiControlMarks($0) }
+        self.sender = parsed.sender
+        self.groupName = parsed.group
+        self.message = parsed.message
 
         let resolvedURL = ObeliskNotification.resolveAppURL(bundleIdentifier: bundleIdentifier, appName: cleanAppName)
         self.appURL = resolvedURL
@@ -89,6 +101,84 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         ]
         let filtered = String(text.unicodeScalars.filter { !bidiMarks.contains($0) })
         return filtered.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Intelligently parses raw sender, group name, and message body across multiple notification schemas
+    /// (e.g. "Sender (Group):", "Sender • Group", or "Sender: ChatMessage" from macOS Notification Center & WhatsApp).
+    public static func parseSenderAndGroup(
+        appName: String,
+        bundleIdentifier: String,
+        rawSender: String,
+        rawGroup: String?,
+        rawMessage: String
+    ) -> (sender: String, group: String?, message: String) {
+        var sender = rawSender.trimmingCharacters(in: .whitespacesAndNewlines)
+        var group = rawGroup?.trimmingCharacters(in: .whitespacesAndNewlines)
+        var message = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        if group?.isEmpty == true { group = nil }
+
+        // Clean invisible directional marks
+        sender = stripBidiControlMarks(sender)
+        group = group.map { stripBidiControlMarks($0) }
+        message = stripBidiControlMarks(message)
+
+        // Case 1: Subtitle joined with bullet " • " (e.g. "Alex • Group Name")
+        if group == nil, let bulletRange = sender.range(of: " • ") {
+            let part1 = String(sender[..<bulletRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let part2 = String(sender[bulletRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !part1.isEmpty && !part2.isEmpty {
+                sender = part1
+                group = part2
+            }
+        }
+
+        // Case 2: Clean trailing colon and spaces from sender (e.g. "Alpin (DR.DAFAG):")
+        while sender.hasSuffix(":") || sender.hasSuffix(" ") {
+            sender = String(sender.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // Case 3: Parenthesized group name with nested parentheses support
+        // e.g. "Alpin Pasuruan (DR.DAFAG (Delegation, Reformation, Democration of Asean Federation and Association Group))"
+        if group == nil, let firstParen = sender.firstIndex(of: "("), sender.hasSuffix(")") {
+            let candSender = String(sender[..<firstParen]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let insideParens = String(sender[sender.index(after: firstParen)..<sender.index(before: sender.endIndex)]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !candSender.isEmpty && !insideParens.isEmpty {
+                sender = candSender
+                group = insideParens
+            }
+        }
+
+        // Case 4: Chat apps with "SenderName: MessageBody" in body
+        let isMessagingApp = bundleIdentifier.contains("whatsapp")
+            || appName.localizedCaseInsensitiveContains("whatsapp")
+            || appName.localizedCaseInsensitiveContains("telegram")
+            || appName.localizedCaseInsensitiveContains("slack")
+            || appName.localizedCaseInsensitiveContains("discord")
+            || appName.localizedCaseInsensitiveContains("messages")
+
+        if isMessagingApp || group != nil {
+            if let colonIdx = message.firstIndex(of: ":") {
+                let prefix = String(message[..<colonIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let rest = String(message[message.index(after: colonIdx)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !prefix.contains("\n") && prefix.count > 0 && prefix.count <= 45 && !rest.isEmpty {
+                    if group != nil && (sender == group || sender.isEmpty) {
+                        sender = prefix
+                        message = rest
+                    } else if group == nil && sender != prefix && isMessagingApp {
+                        group = sender
+                        sender = prefix
+                        message = rest
+                    }
+                }
+            }
+        }
+
+        // Final cleanup of trailing colons from sender
+        while sender.hasSuffix(":") {
+            sender = String(sender.dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return (sender, group, message)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -108,29 +198,26 @@ public struct ObeliskNotification: Identifiable, Equatable, Codable {
         if let g = groupName, !g.isEmpty {
             return g
         }
-        // Fallback for notifications stored as "Sender (Group Name)"
-        if let openParen = sender.firstIndex(of: "("), sender.hasSuffix(")") {
-            let candidateGroup = String(sender[sender.index(after: openParen)..<sender.index(before: sender.endIndex)]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !candidateGroup.isEmpty {
-                return candidateGroup
-            }
-        }
-        return nil
+        let parsed = ObeliskNotification.parseSenderAndGroup(
+            appName: appName,
+            bundleIdentifier: bundleIdentifier,
+            rawSender: sender,
+            rawGroup: groupName,
+            rawMessage: message
+        )
+        return parsed.group
     }
 
     /// Returns the individual sender name (e.g. "Alex" or "Alpin Pasuruan").
     public var resolvedSenderName: String {
-        if let _ = groupName, !sender.isEmpty {
-            return sender
-        }
-        // Fallback for notifications stored as "Sender (Group Name)"
-        if let openParen = sender.firstIndex(of: "("), sender.hasSuffix(")") {
-            let candidateSender = String(sender[..<openParen]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !candidateSender.isEmpty {
-                return candidateSender
-            }
-        }
-        return sender
+        let parsed = ObeliskNotification.parseSenderAndGroup(
+            appName: appName,
+            bundleIdentifier: bundleIdentifier,
+            rawSender: sender,
+            rawGroup: groupName,
+            rawMessage: message
+        )
+        return parsed.sender
     }
 
     public var formattedTimeAgo: String {

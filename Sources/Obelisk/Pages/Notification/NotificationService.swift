@@ -12,6 +12,7 @@ public final class NotificationService: ObservableObject {
     @Published public var recentNotifications: [ObeliskNotification] = []
 
     private var autoDismissWorkItem: DispatchWorkItem?
+    private let distributedHelper = DistributedNotificationHelper()
 
     private init() {
         loadRecentNotifications()
@@ -21,28 +22,33 @@ public final class NotificationService: ObservableObject {
     /// Sets up an inter-process distributed notification observer so external scripts,
     /// terminal CLI commands, or background sidecars can post notifications to Obelisk.
     public func setupDistributedNotificationListener() {
-        DistributedNotificationCenter.default().addObserver(
-            forName: NSNotification.Name("com.obelisk.notification.post"),
-            object: nil,
-            queue: .main
-        ) { [weak self] notif in
-            guard let self = self else { return }
-            let userInfo = notif.userInfo ?? [:]
-            let appName = userInfo["appName"] as? String ?? userInfo["app"] as? String ?? "Notification"
-            let bundleID = userInfo["bundleID"] as? String ?? userInfo["bundleIdentifier"] as? String ?? ""
-            let sender = userInfo["sender"] as? String ?? "Incoming Message"
-            let message = userInfo["message"] as? String ?? ""
-
-            let item = ObeliskNotification(
-                appName: appName,
-                bundleIdentifier: bundleID,
-                sender: sender,
-                message: message
-            )
+        distributedHelper.onReceive = { [weak self] userInfo in
             Task { @MainActor in
+                guard let self = self else { return }
+                let appName = userInfo["appName"] as? String ?? userInfo["app"] as? String ?? "Notification"
+                let bundleID = userInfo["bundleID"] as? String ?? userInfo["bundleIdentifier"] as? String ?? ""
+                let sender = userInfo["sender"] as? String ?? "Incoming Message"
+                let message = userInfo["message"] as? String ?? ""
+                let groupName = userInfo["groupName"] as? String ?? userInfo["group"] as? String
+
+                let item = ObeliskNotification(
+                    appName: appName,
+                    bundleIdentifier: bundleID,
+                    sender: sender,
+                    message: message,
+                    groupName: groupName
+                )
                 self.postNotification(item)
             }
         }
+
+        DistributedNotificationCenter.default().addObserver(
+            distributedHelper,
+            selector: #selector(DistributedNotificationHelper.handleNotification(_:)),
+            name: NSNotification.Name("com.obelisk.notification.post"),
+            object: nil,
+            suspensionBehavior: .deliverImmediately
+        )
     }
 
     /// Posts an incoming notification to the notch Dynamic Island.
@@ -193,5 +199,13 @@ public final class NotificationService: ObservableObject {
         }
         autoDismissWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
+    }
+}
+
+final class DistributedNotificationHelper: NSObject {
+    var onReceive: (([AnyHashable: Any]) -> Void)?
+
+    @objc func handleNotification(_ notif: Notification) {
+        onReceive?(notif.userInfo ?? [:])
     }
 }

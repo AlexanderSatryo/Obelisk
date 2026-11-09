@@ -367,6 +367,7 @@ public final class RealNotificationMonitor: ObservableObject {
         var resolvedBundleID: String = ""
         var sender: String
         var message: String
+        var groupName: String? = nil
 
         let now = Date()
         let hasRecentDelivery: Bool
@@ -391,7 +392,8 @@ public final class RealNotificationMonitor: ObservableObject {
                     resolvedAppName = title
                 }
                 if let subtitle = extracted.subtitle, !subtitle.isEmpty {
-                    sender = "\(title) • \(subtitle)"
+                    sender = title
+                    groupName = subtitle
                 } else {
                     sender = title
                 }
@@ -408,8 +410,14 @@ public final class RealNotificationMonitor: ObservableObject {
                 message = t2
             } else {
                 if resolvedAppName.isEmpty { resolvedAppName = t0 }
-                sender = t0 == resolvedAppName ? t1 : "\(t0) • \(t1)"
-                message = t2
+                if t0 == resolvedAppName {
+                    sender = t1
+                    message = t2
+                } else {
+                    sender = t0
+                    groupName = t1
+                    message = t2
+                }
             }
         } else if extracted.allTexts.count == 2 {
             if resolvedAppName.isEmpty {
@@ -435,8 +443,16 @@ public final class RealNotificationMonitor: ObservableObject {
         }
 
         resolvedAppName = ObeliskNotification.stripBidiControlMarks(resolvedAppName)
-        sender = ObeliskNotification.stripBidiControlMarks(sender)
-        message = ObeliskNotification.stripBidiControlMarks(message)
+        let parsed = ObeliskNotification.parseSenderAndGroup(
+            appName: resolvedAppName,
+            bundleIdentifier: resolvedBundleID,
+            rawSender: sender,
+            rawGroup: groupName,
+            rawMessage: message
+        )
+        sender = parsed.sender
+        groupName = parsed.group
+        message = parsed.message
 
         guard resolvedAppName != "Obelisk", !message.isEmpty else { return false }
 
@@ -452,7 +468,8 @@ public final class RealNotificationMonitor: ObservableObject {
                     appName: resolvedAppName,
                     bundleIdentifier: resolvedBundleID,
                     sender: sender,
-                    message: message
+                    message: message,
+                    groupName: groupName
                 )
                 return true
             } else {
@@ -464,7 +481,8 @@ public final class RealNotificationMonitor: ObservableObject {
                     bundleIdentifier: resolvedBundleID,
                     sender: sender,
                     message: message,
-                    timestamp: now
+                    timestamp: now,
+                    groupName: groupName
                 )
                 NotificationService.shared.postNotification(notification)
                 return true
@@ -484,7 +502,8 @@ public final class RealNotificationMonitor: ObservableObject {
             bundleIdentifier: resolvedBundleID,
             sender: sender,
             message: message,
-            timestamp: now
+            timestamp: now,
+            groupName: groupName
         )
         NotificationService.shared.postNotification(notification)
         return true
@@ -610,7 +629,8 @@ public final class RealNotificationMonitor: ObservableObject {
                     appName: "WhatsApp",
                     bundleIdentifier: "net.whatsapp.WhatsApp",
                     sender: matched.sender,
-                    message: matched.message
+                    message: matched.message,
+                    groupName: matched.groupName
                 )
             }
         }
