@@ -286,13 +286,12 @@ public final class WindowManager: ObservableObject {
             let nameWidth = ceil((notif.appName as NSString).size(withAttributes: [.font: font]).width)
             let leftContentWidth = 16 + 6 + nameWidth
             let rightContentWidth: CGFloat = 118 // "New Notifications!"
-            let sideMargin: CGFloat = 24
+            let sideMargin: CGFloat = 18
             let leftWingNeeded = leftContentWidth + (sideMargin * 2)
             let rightWingNeeded = rightContentWidth + (sideMargin * 2)
             let desiredWing = max(leftWingNeeded, rightWingNeeded)
-            let wingW = min(max(desiredWing, 130), 265)
-            let extraWidth = max(CGFloat(settings.compactWidthOffset), wingW * 2)
-            targetWidth = baseWidth + extraWidth
+            let wingW = min(max(desiredWing, 130), 152)
+            targetWidth = baseWidth + (wingW * 2)
             targetHeight = customBaseHeight
         } else {
             let leftAlways = (settings.leftWingContent == .weatherMini || settings.leftWingContent == .batteryStatus || settings.leftWingContent == .cpuLoad)

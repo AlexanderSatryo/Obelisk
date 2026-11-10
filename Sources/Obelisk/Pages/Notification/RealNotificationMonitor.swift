@@ -78,6 +78,9 @@ public final class RealNotificationMonitor: ObservableObject {
                         } else {
                             self.captureWhatsAppSnapshot()
                         }
+                        if NotificationService.shared.recentNotifications.contains(where: { $0.message == "New notification received" }) {
+                            self.backfillUnenrichedWhatsAppNotifications()
+                        }
                     }
                 }
             }
@@ -101,6 +104,13 @@ public final class RealNotificationMonitor: ObservableObject {
 
     /// Prompts macOS to grant Accessibility permission to Obelisk so banner message bodies can be read.
     public func requestAccessibilityPermission() {
+        if !AXIsProcessTrusted() {
+            let resetProc = Process()
+            resetProc.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+            resetProc.arguments = ["reset", "Accessibility", "com.alxstry.obelisk"]
+            try? resetProc.run()
+            resetProc.waitUntilExit()
+        }
         let promptKey = "AXTrustedCheckOptionPrompt" as CFString
         let options = [promptKey: true] as CFDictionary
         isAccessibilityTrusted = AXIsProcessTrustedWithOptions(options)
@@ -269,6 +279,15 @@ public final class RealNotificationMonitor: ObservableObject {
               let windows = windowsRef as? [AXUIElement] else { return }
 
         for window in windows {
+            let extracted = extractBannerFields(from: window)
+            if !extracted.allTexts.isEmpty {
+                var descRef: CFTypeRef?
+                AXUIElementCopyAttributeValue(window, kAXDescriptionAttribute as CFString, &descRef)
+                let desc = ObeliskNotification.stripBidiControlMarks(descRef as? String ?? "")
+                if handleExtractedBanner(extracted: extracted, rawDescription: desc) {
+                    continue
+                }
+            }
             scanElement(window)
         }
     }
@@ -282,20 +301,18 @@ public final class RealNotificationMonitor: ObservableObject {
         let role = roleRef as? String ?? ""
         let subrole = subroleRef as? String ?? ""
 
-        let isBannerSubrole = (subrole == "AXNotificationCenterBanner" || subrole == "AXNotificationCenterAlert")
-        let isCandidateContainer = isBannerSubrole || role == "AXGroup" || role == "AXButton"
+        let isBannerSubrole = (subrole == "AXNotificationCenterBanner" || subrole == "AXNotificationCenterAlert" || subrole == "AXSystemDialog")
+        let isCandidateContainer = isBannerSubrole || role == "AXGroup" || role == "AXButton" || role == "AXWindow"
 
         if isCandidateContainer {
             var descRef: CFTypeRef?
             AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &descRef)
             let desc = ObeliskNotification.stripBidiControlMarks(descRef as? String ?? "")
 
-            if isBannerSubrole || (!desc.isEmpty && desc.contains(",")) {
-                let extracted = extractBannerFields(from: element)
-                if !extracted.allTexts.isEmpty || desc.contains(",") {
-                    if handleExtractedBanner(extracted: extracted, rawDescription: desc) {
-                        return
-                    }
+            let extracted = extractBannerFields(from: element)
+            if !extracted.allTexts.isEmpty || (!desc.isEmpty && desc.contains(",")) {
+                if handleExtractedBanner(extracted: extracted, rawDescription: desc) {
+                    return
                 }
             }
         }
@@ -626,23 +643,43 @@ public final class RealNotificationMonitor: ObservableObject {
         let rows = readWhatsAppChatRows().filter { !$0.isSentByMe }
         guard !rows.isEmpty else { return }
 
-        let unreadOrRecent = rows.filter { $0.isUnread } + rows.filter { !$0.isUnread && !$0.isPinned }
-        guard let topFallback = unreadOrRecent.first else { return }
+        let unreadOrRecent = rows.filter { $0.isUnread } + rows.filter { !$0.isUnread && !$0.isPinned } + rows.filter { !$0.isUnread && $0.isPinned }
+        guard !unreadOrRecent.isEmpty else { return }
 
         let service = NotificationService.shared
-        for item in service.recentNotifications {
+        let currentItems = service.recentNotifications
+        var usedSignatures = Set<String>(
+            currentItems
+                .filter { $0.message != "New notification received" }
+                .map { "\($0.sender)|\($0.groupName ?? "")|\($0.message)" }
+        )
+
+        for item in currentItems {
             if (item.bundleIdentifier == "net.whatsapp.WhatsApp" || item.appName == "WhatsApp"),
                item.message == "New notification received" {
                 let itemTokens = Self.timeTokens(for: item.timestamp)
-                let matched = rows.first(where: { !($0.timeToken.isEmpty) && itemTokens.contains($0.timeToken) }) ?? topFallback
-                service.enrichNotification(
-                    id: item.id,
-                    appName: "WhatsApp",
-                    bundleIdentifier: "net.whatsapp.WhatsApp",
-                    sender: matched.sender,
-                    message: matched.message,
-                    groupName: matched.groupName
-                )
+                let tokenMatch = rows.first(where: {
+                    !($0.timeToken.isEmpty) && itemTokens.contains($0.timeToken) &&
+                    !usedSignatures.contains("\($0.sender)|\($0.groupName ?? "")|\($0.message)")
+                })
+                let fallbackMatch = unreadOrRecent.first(where: {
+                    !usedSignatures.contains("\($0.sender)|\($0.groupName ?? "")|\($0.message)")
+                })
+
+                if let matched = tokenMatch ?? fallbackMatch {
+                    let sig = "\(matched.sender)|\(matched.groupName ?? "")|\(matched.message)"
+                    usedSignatures.insert(sig)
+                    service.enrichNotification(
+                        id: item.id,
+                        appName: "WhatsApp",
+                        bundleIdentifier: "net.whatsapp.WhatsApp",
+                        sender: matched.sender,
+                        message: matched.message,
+                        groupName: matched.groupName
+                    )
+                } else {
+                    service.removeRecentNotification(id: item.id)
+                }
             }
         }
     }
@@ -660,6 +697,11 @@ public final class RealNotificationMonitor: ObservableObject {
         if AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &mainWinRef) == .success,
            let mainWin = mainWinRef {
             candidateRoots.append(mainWin as! AXUIElement)
+        }
+        var focusedWinRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &focusedWinRef) == .success,
+           let focusedWin = focusedWinRef {
+            candidateRoots.append(focusedWin as! AXUIElement)
         }
         var windowsRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
@@ -738,6 +780,7 @@ public final class RealNotificationMonitor: ObservableObject {
 
         let isSentByMe = v.contains(", Sent to ") || v.hasPrefix("Your ")
         let isPinned = v.hasSuffix(", Pinned")
+        let isGroupChat = v.range(of: #",\s*Received\s+in\s+"#, options: .regularExpression) != nil
 
         var isUnread = false
         var chatTitle = d
@@ -783,6 +826,17 @@ public final class RealNotificationMonitor: ObservableObject {
                     sender = groupSender
                     groupName = chatTitle
                 }
+                body = msgPart
+            }
+        } else if isGroupChat, let fromRange = body.range(of: #"\s+from\s+([^,]+)$"#, options: .regularExpression) {
+            let fullMatch = String(body[fromRange])
+            let extractedSender = ObeliskNotification.stripBidiControlMarks(
+                fullMatch.replacingOccurrences(of: #"^\s+from\s+"#, with: "", options: .regularExpression)
+            )
+            let msgPart = ObeliskNotification.stripBidiControlMarks(String(body[..<fromRange.lowerBound]))
+            if !extractedSender.isEmpty && !msgPart.isEmpty {
+                sender = extractedSender
+                groupName = chatTitle
                 body = msgPart
             }
         }

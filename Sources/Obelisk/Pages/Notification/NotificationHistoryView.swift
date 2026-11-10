@@ -38,15 +38,18 @@ public struct NotificationHistoryView: View {
         .frame(height: 114)
         .padding(.top, 2)
         .onAppear {
+            RealNotificationMonitor.shared.backfillUnenrichedWhatsAppNotifications()
             autoAuthenticateWithTouchID()
         }
         .onChange(of: windowManager.isExpanded) { isExpanded in
             if isExpanded && windowManager.currentTab == .notification {
+                RealNotificationMonitor.shared.backfillUnenrichedWhatsAppNotifications()
                 autoAuthenticateWithTouchID()
             }
         }
         .onChange(of: windowManager.currentTab) { tab in
             if tab == .notification && windowManager.isExpanded {
+                RealNotificationMonitor.shared.backfillUnenrichedWhatsAppNotifications()
                 autoAuthenticateWithTouchID()
             }
         }
