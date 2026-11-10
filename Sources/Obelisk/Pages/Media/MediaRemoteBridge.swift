@@ -125,6 +125,7 @@ var controllers: [String: NSObject] = [:]
 var lastArtTitleByKey: [String: String] = [:]
 var lastArtPathByKey: [String: String] = [:]
 var isPolling = false
+var lastPollStartTime = Date.distantPast
 
 let spotifyPosScript: NSAppleScript? = {
     let s = NSAppleScript(source: "tell application \"Spotify\" to if it is running then return (player position as real)")
@@ -146,8 +147,16 @@ func parseDouble(_ val: Any?) -> Double {
 }
 
 func pollAllPlayers(forceArtwork: Bool = false) {
-    if isPolling && !forceArtwork { return }
+    let now = Date()
+    if isPolling && !forceArtwork {
+        if now.timeIntervalSince(lastPollStartTime) > 1.5 {
+            isPolling = false
+        } else {
+            return
+        }
+    }
     isPolling = true
+    lastPollStartTime = now
 
     getClients(DispatchQueue.main) { arr in
         guard let clients = arr as? [NSObject], !clients.isEmpty else {
@@ -159,6 +168,7 @@ func pollAllPlayers(forceArtwork: Bool = false) {
 
         let group = DispatchGroup()
         var results: [[String: Any]] = []
+        var activeKeys = Set<String>()
 
         for c in clients {
             let bundleId = c.value(forKey: "bundleIdentifier") as? String ?? ""
@@ -173,43 +183,42 @@ func pollAllPlayers(forceArtwork: Bool = false) {
                 }
 
                 for (idx, pl) in players.enumerated() {
-                    group.enter()
                     let key = "\(bundleId)|\(parentId)|\(displayName)|\(idx)"
-                    let pp = playerPathClass.init()
-                    pp.setValue(localOrigin, forKey: "origin")
-                    pp.setValue(c, forKey: "client")
-                    pp.setValue(pl, forKey: "player")
+                    activeKeys.insert(key)
 
-                    let dest = destClass.init()
-                    dest.setValue(pp, forKey: "playerPath")
+                    let ctrl: NSObject
+                    if let existing = controllers[key] {
+                        ctrl = existing
+                    } else {
+                        let pp = playerPathClass.init()
+                        pp.setValue(localOrigin, forKey: "origin")
+                        pp.setValue(c, forKey: "client")
+                        pp.setValue(pl, forKey: "player")
 
-                    let hasCachedArt: Bool = {
-                        guard !forceArtwork,
-                              let path = lastArtPathByKey[key],
-                              FileManager.default.fileExists(atPath: path) else {
-                            return false
+                        let dest = destClass.init()
+                        dest.setValue(pp, forKey: "playerPath")
+
+                        let qReq = reqQueueClass.perform(NSSelectorFromString("defaultPlaybackQueueRequest"))?.takeUnretainedValue() as? NSObject
+                        qReq?.setValue(600.0, forKey: "artworkWidth")
+                        qReq?.setValue(600.0, forKey: "artworkHeight")
+                        qReq?.setValue(true, forKey: "includeMetadata")
+
+                        let cfg = configClass.init()
+                        cfg.setValue(dest, forKey: "destination")
+                        cfg.setValue(true, forKey: "requestPlaybackState")
+                        cfg.setValue(true, forKey: "requestPlaybackQueue")
+                        cfg.setValue(true, forKey: "requestClientProperties")
+                        if let qReq = qReq {
+                            cfg.setValue(qReq, forKey: "playbackQueueRequest")
                         }
-                        return true
-                    }()
 
-                    let qReq = reqQueueClass.perform(NSSelectorFromString("defaultPlaybackQueueRequest"))?.takeUnretainedValue() as? NSObject
-                    qReq?.setValue(hasCachedArt ? 0.0 : 600.0, forKey: "artworkWidth")
-                    qReq?.setValue(hasCachedArt ? 0.0 : 600.0, forKey: "artworkHeight")
-                    qReq?.setValue(true, forKey: "includeMetadata")
-
-                    let cfg = configClass.init()
-                    cfg.setValue(dest, forKey: "destination")
-                    cfg.setValue(true, forKey: "requestPlaybackState")
-                    cfg.setValue(true, forKey: "requestPlaybackQueue")
-                    cfg.setValue(true, forKey: "requestClientProperties")
-                    if let qReq = qReq {
-                        cfg.setValue(qReq, forKey: "playbackQueueRequest")
+                        let raw = class_createInstance(controllerClass, 0) as AnyObject
+                        let created = initFn(raw, initSel, cfg)
+                        controllers[key] = created
+                        ctrl = created
                     }
 
-                    let raw = class_createInstance(controllerClass, 0) as AnyObject
-                    let ctrl = initFn(raw, initSel, cfg)
-                    controllers[key] = ctrl
-
+                    group.enter()
                     reqFn(ctrl, reqSel) { resp, _ in
                         defer { group.leave() }
                         guard let resp = resp,
@@ -266,12 +275,6 @@ func pollAllPlayers(forceArtwork: Bool = false) {
                         if lastArtTitleByKey[key] != title {
                             lastArtTitleByKey[key] = title
                             lastArtPathByKey.removeValue(forKey: key)
-                            // Trigger artwork fetch on next pass if we didn't request it on this pass
-                            if hasCachedArt {
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                    pollAllPlayers(forceArtwork: true)
-                                }
-                            }
                         }
 
                         var artPath = lastArtPathByKey[key] ?? ""
@@ -309,6 +312,13 @@ func pollAllPlayers(forceArtwork: Bool = false) {
 
         group.notify(queue: .main) {
             isPolling = false
+            for existingKey in Array(controllers.keys) {
+                if !activeKeys.contains(existingKey) {
+                    controllers.removeValue(forKey: existingKey)
+                    lastArtTitleByKey.removeValue(forKey: existingKey)
+                    lastArtPathByKey.removeValue(forKey: existingKey)
+                }
+            }
             if let data = try? JSONSerialization.data(withJSONObject: results),
                let str = String(data: data, encoding: .utf8) {
                 print("PLAYERS_JSON:\(str)")
@@ -326,15 +336,43 @@ func executeCommandLine(_ line: String) {
     let paramVal = Double(parts[3]) ?? 0
 
     var ctrl: NSObject? = controllers[targetKey]
-    if ctrl == nil {
-        // Fallback match by substring (e.g. "YouTube", "Vidio", "com.spotify.client")
-        for (k, v) in controllers {
-            if !targetKey.isEmpty && k.localizedCaseInsensitiveContains(targetKey) {
-                ctrl = v
-                break
+    if ctrl == nil && !targetKey.isEmpty {
+        let subparts = targetKey.components(separatedBy: "|")
+        let targetBundle = subparts.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let targetName = subparts.count > 2 ? subparts[2].trimmingCharacters(in: .whitespacesAndNewlines) : ""
+
+        // 1. Match by Bundle ID prefix
+        if !targetBundle.isEmpty {
+            for (k, v) in controllers {
+                let kBundle = k.components(separatedBy: "|").first ?? ""
+                if kBundle.lowercased() == targetBundle.lowercased() {
+                    ctrl = v
+                    break
+                }
+            }
+        }
+
+        // 2. Match by Display Name
+        if ctrl == nil && !targetName.isEmpty {
+            for (k, v) in controllers {
+                if k.localizedCaseInsensitiveContains(targetName) {
+                    ctrl = v
+                    break
+                }
+            }
+        }
+
+        // 3. Match by partial substring
+        if ctrl == nil {
+            for (k, v) in controllers {
+                if k.localizedCaseInsensitiveContains(targetKey) || targetKey.localizedCaseInsensitiveContains(k) {
+                    ctrl = v
+                    break
+                }
             }
         }
     }
+
     if ctrl == nil {
         ctrl = controllers.values.first
     }
@@ -348,7 +386,7 @@ func executeCommandLine(_ line: String) {
 
     if let ctrl = ctrl {
         sendFn(ctrl, sendSel, cmdInt, opts) { _ in
-            for delay in [0.12, 0.38] {
+            for delay in [0.08, 0.25] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                     pollAllPlayers(forceArtwork: false)
                 }
@@ -356,7 +394,7 @@ func executeCommandLine(_ line: String) {
         }
     } else {
         _ = globalSendCmd?(cmdInt, opts)
-        for delay in [0.12, 0.38] {
+        for delay in [0.08, 0.25] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 pollAllPlayers(forceArtwork: false)
             }
@@ -534,7 +572,20 @@ RunLoop.main.run()
     public func sendSidecarCommand(targetKey: String? = nil, command: UInt32, parameter: Double = 0) {
         let keyToUse = targetKey ?? activeTargetKey
         let line = "CMD|||\(keyToUse)|||\(command)|||\(parameter)\n"
-        if let data = line.data(using: .utf8) {
+        guard let data = line.data(using: .utf8) else { return }
+
+        stateLock.lock()
+        defer { stateLock.unlock() }
+
+        if sidecarProcess == nil || !(sidecarProcess?.isRunning ?? false) {
+            startSidecar()
+        }
+
+        do {
+            try stdinPipe?.fileHandleForWriting.write(contentsOf: data)
+        } catch {
+            // Broken pipe or crashed sidecar, restart and retry once
+            startSidecar()
             try? stdinPipe?.fileHandleForWriting.write(contentsOf: data)
         }
     }

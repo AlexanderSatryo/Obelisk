@@ -269,6 +269,11 @@ public final class MediaManager: ObservableObject {
             source: source
         )
 
+        let metadataChanged = (self.currentTrack.title != cleanTitle) ||
+                              (self.currentTrack.artist != cleanArtist) ||
+                              (self.currentTrack.isPlaying != effectivePlaying) ||
+                              (self.currentTrack.source != source)
+
         self.currentTrack = track
         self.lastActiveSource = source
 
@@ -330,7 +335,9 @@ public final class MediaManager: ObservableObject {
             }
         }
 
-        WindowManager.shared.updateCompactWidth()
+        if metadataChanged {
+            WindowManager.shared.updateCompactWidth()
+        }
 
         if (source == .spotify || source == .appleMusic) && track.duration > 0 {
             LyricsService.shared.fetchLyrics(for: track)
@@ -347,7 +354,7 @@ public final class MediaManager: ObservableObject {
         handleSidecarPlayersUpdate(MediaRemoteBridge.shared.getLatestPlayers())
     }
 
-    // MARK: - Playback Controls (Explicit Play / Pause & Native Background Seeking)
+    // MARK: - Playback Controls (Multi-Layer Resilient Transport Controls)
     public func togglePlayPause() {
         lastManualSeekTime = .distantPast
         lastUserToggleTime = Date()
@@ -355,11 +362,33 @@ public final class MediaManager: ObservableObject {
         currentTrack.isPlaying = willPlay
 
         let targetKey = MediaRemoteBridge.shared.activeTargetKey
+
+        // Direct AppleScript for Spotify (instant & 100% reliable)
+        if currentTrack.source == .spotify {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let script = willPlay ? "tell application \"Spotify\" to play" : "tell application \"Spotify\" to pause"
+                if let appleScript = NSAppleScript(source: script) {
+                    var error: NSDictionary?
+                    appleScript.executeAndReturnError(&error)
+                }
+            }
+        } else if currentTrack.source == .appleMusic {
+            // Direct AppleScript for Apple Music (instant & 100% reliable)
+            DispatchQueue.global(qos: .userInitiated).async {
+                let script = willPlay ? "tell application \"Music\" to play" : "tell application \"Music\" to pause"
+                if let appleScript = NSAppleScript(source: script) {
+                    var error: NSDictionary?
+                    appleScript.executeAndReturnError(&error)
+                }
+            }
+        } else if MediaRemoteBridge.shared.getLatestPlayers().isEmpty {
+            // Universal Virtual Media Key fallback
+            SystemMediaKeyHelper.sendSystemMediaKey(16) // NX_KEYTYPE_PLAY
+        }
+
         if willPlay {
-            // Explicitly send PLAY (0) so it never gets inverted
             MediaRemoteBridge.shared.play(targetKey: targetKey)
         } else {
-            // Explicitly send PAUSE (1) so it never gets inverted
             MediaRemoteBridge.shared.pause(targetKey: targetKey)
         }
 
@@ -368,26 +397,86 @@ public final class MediaManager: ObservableObject {
     }
 
     public func nextTrack() {
-        if currentTrack.source == .youtube {
-            skipYouTube(seconds: 15)
+        let targetKey = MediaRemoteBridge.shared.activeTargetKey
+
+        if currentTrack.source == .spotify {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let script = "tell application \"Spotify\" to next track"
+                if let appleScript = NSAppleScript(source: script) {
+                    var error: NSDictionary?
+                    appleScript.executeAndReturnError(&error)
+                }
+            }
+            MediaRemoteBridge.shared.nextTrack(targetKey: targetKey)
+            keepCursorVisible()
             return
-        } else if currentTrack.source == .vidio {
-            skipVidio(seconds: 15)
+        } else if currentTrack.source == .appleMusic {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let script = "tell application \"Music\" to next track"
+                if let appleScript = NSAppleScript(source: script) {
+                    var error: NSDictionary?
+                    appleScript.executeAndReturnError(&error)
+                }
+            }
+            MediaRemoteBridge.shared.nextTrack(targetKey: targetKey)
+            keepCursorVisible()
             return
         }
-        MediaRemoteBridge.shared.nextTrack()
+
+        if currentTrack.source == .youtube {
+            skipYouTube(seconds: ObeliskSettings.shared.skipIntervalSeconds)
+            return
+        } else if currentTrack.source == .vidio {
+            skipVidio(seconds: ObeliskSettings.shared.skipIntervalSeconds)
+            return
+        }
+
+        if MediaRemoteBridge.shared.getLatestPlayers().isEmpty {
+            SystemMediaKeyHelper.sendSystemMediaKey(17) // NX_KEYTYPE_NEXT
+        }
+        MediaRemoteBridge.shared.nextTrack(targetKey: targetKey)
         keepCursorVisible()
     }
 
     public func previousTrack() {
-        if currentTrack.source == .youtube {
-            skipYouTube(seconds: -15)
+        let targetKey = MediaRemoteBridge.shared.activeTargetKey
+
+        if currentTrack.source == .spotify {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let script = "tell application \"Spotify\" to previous track"
+                if let appleScript = NSAppleScript(source: script) {
+                    var error: NSDictionary?
+                    appleScript.executeAndReturnError(&error)
+                }
+            }
+            MediaRemoteBridge.shared.previousTrack(targetKey: targetKey)
+            keepCursorVisible()
             return
-        } else if currentTrack.source == .vidio {
-            skipVidio(seconds: -15)
+        } else if currentTrack.source == .appleMusic {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let script = "tell application \"Music\" to previous track"
+                if let appleScript = NSAppleScript(source: script) {
+                    var error: NSDictionary?
+                    appleScript.executeAndReturnError(&error)
+                }
+            }
+            MediaRemoteBridge.shared.previousTrack(targetKey: targetKey)
+            keepCursorVisible()
             return
         }
-        MediaRemoteBridge.shared.previousTrack()
+
+        if currentTrack.source == .youtube {
+            skipYouTube(seconds: -ObeliskSettings.shared.skipIntervalSeconds)
+            return
+        } else if currentTrack.source == .vidio {
+            skipVidio(seconds: -ObeliskSettings.shared.skipIntervalSeconds)
+            return
+        }
+
+        if MediaRemoteBridge.shared.getLatestPlayers().isEmpty {
+            SystemMediaKeyHelper.sendSystemMediaKey(18) // NX_KEYTYPE_PREVIOUS
+        }
+        MediaRemoteBridge.shared.previousTrack(targetKey: targetKey)
         keepCursorVisible()
     }
 
@@ -404,7 +493,8 @@ public final class MediaManager: ObservableObject {
         lastManualSeekTime = Date()
         LyricsService.shared.updatePosition(clamped, isPlaying: currentTrack.isPlaying, forceSnap: true)
 
-        MediaRemoteBridge.shared.setElapsedTime(clamped)
+        let targetKey = MediaRemoteBridge.shared.activeTargetKey
+        MediaRemoteBridge.shared.setElapsedTime(clamped, targetKey: targetKey)
 
         // Direct instant seeking fallback for Spotify and Apple Music
         if currentTrack.source == .spotify {
@@ -443,8 +533,8 @@ public final class MediaManager: ObservableObject {
         currentTrack.position = newPos
         manualSeekTargetPosition = newPos
 
-        // Direct MediaRemote SeekToPlaybackPosition (24) on YouTube's MRNowPlayingController
-        MediaRemoteBridge.shared.setElapsedTime(newPos)
+        let targetKey = MediaRemoteBridge.shared.activeTargetKey
+        MediaRemoteBridge.shared.setElapsedTime(newPos, targetKey: targetKey)
         keepCursorVisible()
     }
 
@@ -463,11 +553,9 @@ public final class MediaManager: ObservableObject {
         currentTrack.position = newPos
         manualSeekTargetPosition = newPos
 
-        if seconds > 0 {
-            MediaRemoteBridge.shared.skipForward15()
-        } else {
-            MediaRemoteBridge.shared.skipBackward15()
-        }
+        // Use Command 24 (SeekToPlaybackPosition) because SkipForward/Backward (17/18) is unsupported in web browsers
+        let targetKey = MediaRemoteBridge.shared.activeTargetKey
+        MediaRemoteBridge.shared.setElapsedTime(newPos, targetKey: targetKey)
         keepCursorVisible()
     }
 
@@ -525,5 +613,32 @@ extension NSImage {
         }
 
         return bestColor
+    }
+}
+
+// MARK: - Universal macOS Virtual Media Key Dispatcher
+
+public enum SystemMediaKeyHelper: Sendable {
+    public static func sendSystemMediaKey(_ key: Int32) {
+        func doKey(_ down: Bool) {
+            let flags = NSEvent.ModifierFlags(rawValue: down ? 0xa00 : 0xb00)
+            let data1 = Int((key << 16) | (down ? 0xa00 : 0xb00))
+            let ev = NSEvent.otherEvent(
+                with: .systemDefined,
+                location: .zero,
+                modifierFlags: flags,
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                subtype: 8,
+                data1: data1,
+                data2: -1
+            )
+            if let cgEv = ev?.cgEvent {
+                cgEv.post(tap: .cghidEventTap)
+            }
+        }
+        doKey(true)
+        doKey(false)
     }
 }
