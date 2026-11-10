@@ -151,7 +151,7 @@ public struct RootView: View {
                 guard !ScreenGeometry.isMissionControlActive() else { return }
                 if !windowManager.isExpanded {
                     if notificationService.activeNotification != nil {
-                        notificationService.dismissNotification()
+                        windowManager.expand(openingTab: .notification)
                     } else if settings.triggerMode != .hoverOnly {
                         windowManager.expand()
                     }

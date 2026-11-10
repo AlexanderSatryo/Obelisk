@@ -49,8 +49,7 @@ public struct NotificationNotchView: View {
         .frame(width: totalWidth, height: topRowHeight)
         .contentShape(Rectangle())
         .onTapGesture {
-            // Dismiss standby notification HUD cleanly
-            notificationService.dismissNotification()
+            windowManager.expand(openingTab: .notification)
         }
     }
 
