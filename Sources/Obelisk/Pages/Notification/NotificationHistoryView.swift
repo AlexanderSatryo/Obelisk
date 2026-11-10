@@ -8,6 +8,7 @@ public struct NotificationHistoryView: View {
     @ObservedObject var biometrics: BiometricPrivacyService = .shared
     @ObservedObject var settings: ObeliskSettings = .shared
     @ObservedObject var windowManager: WindowManager = .shared
+    @ObservedObject var monitor: RealNotificationMonitor = .shared
 
     @State private var hoveredNotificationId: UUID? = nil
 
@@ -213,6 +214,27 @@ public struct NotificationHistoryView: View {
                 }
 
                 Spacer()
+
+                if !monitor.isAccessibilityTrusted {
+                    Button(action: {
+                        monitor.requestAccessibilityPermission(resetTCC: true)
+                    }) {
+                        HStack(spacing: 3.5) {
+                            Image(systemName: "exclamationmark.shield.fill")
+                                .font(.system(size: 8.5, weight: .semibold))
+                            Text("Allow Accessibility")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .foregroundColor(Color(red: 255/255, green: 214/255, blue: 10/255))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule().fill(Color(red: 255/255, green: 214/255, blue: 10/255).opacity(0.16))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .pointingHandCursor()
+                }
 
                 Button(action: {
                     notificationService.clearAllRecentNotifications()
