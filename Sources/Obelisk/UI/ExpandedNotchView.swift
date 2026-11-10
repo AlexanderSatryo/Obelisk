@@ -25,7 +25,7 @@ public struct ExpandedNotchView: View {
             } else if telemetry.batteryPercentage >= 100 {
                 return "Fully Charged"
             } else {
-                return "Calculating..."
+                return "Charging"
             }
         } else if telemetry.isPluggedIn {
             return telemetry.batteryPercentage >= 100 ? "Fully Charged" : "Power Adapter"

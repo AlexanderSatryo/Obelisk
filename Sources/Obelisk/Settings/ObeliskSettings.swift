@@ -916,9 +916,46 @@ public final class ObeliskSettings: ObservableObject {
         }
     }
 
+    // MARK: - Reinstall Detection & Clean State Setup
+
+    private static func currentInstallationFingerprint() -> String {
+        let bundlePath = Bundle.main.bundlePath
+        let attrs = try? FileManager.default.attributesOfItem(atPath: bundlePath)
+        let creationTime = (attrs?[.creationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        let inode = (attrs?[.systemFileNumber] as? NSNumber)?.int64Value ?? 0
+
+        let execPath = Bundle.main.executableURL?.path ?? ""
+        let execAttrs = try? FileManager.default.attributesOfItem(atPath: execPath)
+        let execModTime = (execAttrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+
+        return "\(bundlePath)|\(creationTime)|\(inode)|\(execModTime)"
+    }
+
+    private static func checkAndResetOnReinstall(defaults: UserDefaults) {
+        let currentSig = currentInstallationFingerprint()
+        let sigKey = "obelisk_installed_bundle_signature"
+        let savedSig = defaults.string(forKey: sigKey)
+
+        if savedSig != currentSig {
+            let bundleId = Bundle.main.bundleIdentifier ?? "com.alxstry.obelisk"
+            defaults.removePersistentDomain(forName: bundleId)
+
+            for key in defaults.dictionaryRepresentation().keys {
+                if key.hasPrefix("cfg_") || key.hasPrefix("weather_") || key.hasPrefix("obelisk_") || key == "cachedWeatherData" {
+                    defaults.removeObject(forKey: key)
+                }
+            }
+
+            defaults.set(currentSig, forKey: sigKey)
+            defaults.synchronize()
+        }
+    }
+
     // MARK: Initialization
 
     private init() {
+        Self.checkAndResetOnReinstall(defaults: defaults)
+
         let legacySurface = NotchSurfaceStyle(rawValue: defaults.string(forKey: "cfg_surfaceStyle") ?? "")
         let compStyle = NotchSurfaceStyle(rawValue: defaults.string(forKey: "cfg_compactSurfaceStyle") ?? "") ?? .pitchBlack
         let expStyle = NotchSurfaceStyle(rawValue: defaults.string(forKey: "cfg_expandedSurfaceStyle") ?? "") ?? legacySurface ?? .liquidGlass

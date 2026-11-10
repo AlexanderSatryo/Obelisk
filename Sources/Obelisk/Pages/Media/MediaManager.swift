@@ -22,7 +22,14 @@ public final class MediaManager: ObservableObject {
     @Published public var sourceLogoImage: NSImage?
 
     private var lastActiveSource: PlayerSource = .none
-    private var preferredSourceOverride: PlayerSource? = nil
+
+    // Player tracking for "most recently played" selection
+    private var playerPlaybackStartTimes: [String: Date] = [:]
+    private var playerPlaybackActiveTimes: [String: Date] = [:]
+    private var sourcePlaybackStartTimes: [PlayerSource: Date] = [:]
+    private var sourcePlaybackActiveTimes: [PlayerSource: Date] = [:]
+    private var previousPlayingStates: [String: Bool] = [:]
+
     private var lastManualSeekTime: Date = .distantPast
     private var manualSeekTargetPosition: Double = 0
     private var lastUserToggleTime: Date = .distantPast
@@ -104,25 +111,25 @@ public final class MediaManager: ObservableObject {
     }
 
     private func handleApplicationActivated(name: String, bundle: String) {
-
-        if name.contains("vidio") || bundle.contains("vidio") {
-            preferredSourceOverride = .vidio
-            handleSidecarPlayersUpdate(MediaRemoteBridge.shared.getLatestPlayers())
-        } else if name.contains("youtube") || bundle.contains("youtube") {
-            preferredSourceOverride = .youtube
-            handleSidecarPlayersUpdate(MediaRemoteBridge.shared.getLatestPlayers())
-        } else if bundle == "com.spotify.client" {
-            preferredSourceOverride = .spotify
-            handleSidecarPlayersUpdate(MediaRemoteBridge.shared.getLatestPlayers())
-        } else if bundle == "com.apple.music" {
-            preferredSourceOverride = .appleMusic
-            handleSidecarPlayersUpdate(MediaRemoteBridge.shared.getLatestPlayers())
-        } else if bundle == "com.google.chrome" || bundle == "com.apple.safari" {
-            preferredSourceOverride = nil
+        if bundle == "com.google.chrome" || bundle == "com.apple.safari" {
             if !checkBrowserTabMedia() {
                 handleSidecarPlayersUpdate(MediaRemoteBridge.shared.getLatestPlayers())
             }
+        } else {
+            handleSidecarPlayersUpdate(MediaRemoteBridge.shared.getLatestPlayers())
         }
+    }
+
+    private func lastPlaybackStartTime(for p: RemoteMediaState) -> Date {
+        let keyDate = playerPlaybackStartTimes[p.key] ?? .distantPast
+        let srcDate = sourcePlaybackStartTimes[classifySource(for: p)] ?? .distantPast
+        return max(keyDate, srcDate)
+    }
+
+    private func lastPlaybackActiveTime(for p: RemoteMediaState) -> Date {
+        let keyDate = playerPlaybackActiveTimes[p.key] ?? .distantPast
+        let srcDate = sourcePlaybackActiveTimes[classifySource(for: p)] ?? .distantPast
+        return max(keyDate, srcDate)
     }
 
     // MARK: - Real-Time Sidecar Stream Handler (Every 0.4s & Instant Notifications)
@@ -144,63 +151,67 @@ public final class MediaManager: ObservableObject {
             return
         }
 
-        let frontApp = NSWorkspace.shared.frontmostApplication
-        let frontName = (frontApp?.localizedName ?? "").lowercased()
-        let frontBundle = (frontApp?.bundleIdentifier ?? "").lowercased()
+        let now = Date()
 
-        var targetSource: PlayerSource? = preferredSourceOverride
-        if frontName.contains("vidio") || frontBundle.contains("vidio") {
-            targetSource = .vidio
-            preferredSourceOverride = .vidio
-        } else if frontName.contains("youtube") || frontBundle.contains("youtube") {
-            targetSource = .youtube
-            preferredSourceOverride = .youtube
-        } else if frontBundle == "com.spotify.client" {
-            targetSource = .spotify
-            preferredSourceOverride = .spotify
-        } else if frontBundle == "com.apple.music" {
-            targetSource = .appleMusic
-            preferredSourceOverride = .appleMusic
-        }
-
-        // Score all live players to select the active one
-        var bestPlayer: RemoteMediaState?
-        var bestScore: Int = Int.min
-
+        // 1. Detect state transitions to update last played timestamps
         for p in validPlayers {
+            let wasPlaying = previousPlayingStates[p.key] ?? false
             let src = classifySource(for: p)
-            var score = 0
 
-            // 1. Actively playing media gets high priority
             if p.isPlaying {
-                score += 350
-            }
+                // Keep active time fresh as long as player is playing
+                playerPlaybackActiveTimes[p.key] = now
+                sourcePlaybackActiveTimes[src] = now
 
-            // 2. Match frontmost or user-focused media app
-            if let target = targetSource, src == target {
-                score += 500
+                if !wasPlaying || playerPlaybackStartTimes[p.key] == nil {
+                    // Newly started playing!
+                    playerPlaybackStartTimes[p.key] = now
+                    sourcePlaybackStartTimes[src] = now
+                }
             }
-
-            // 3. Match previously active source for continuity
-            if src == lastActiveSource {
-                score += 120
-            }
-
-            // 4. Valid duration & metadata bonus
-            if p.duration > 0 {
-                score += 40
-            }
-            if !p.artworkPath.isEmpty {
-                score += 20
-            }
-
-            if score > bestScore {
-                bestScore = score
-                bestPlayer = p
-            }
+            previousPlayingStates[p.key] = p.isPlaying
         }
 
-        guard let chosen = bestPlayer else { return }
+        // 2. Select the player according to user rule: "yang terakhir saya play"
+        let playingPlayers = validPlayers.filter { $0.isPlaying }
+        let chosen: RemoteMediaState
+
+        if !playingPlayers.isEmpty {
+            // If one or more are playing, pick the one that started playing most recently
+            chosen = playingPlayers.max { a, b in
+                let timeA = lastPlaybackStartTime(for: a)
+                let timeB = lastPlaybackStartTime(for: b)
+                if timeA != timeB {
+                    return timeA < timeB
+                }
+                // Tiebreaker: stick with current source if valid
+                if classifySource(for: a) == self.lastActiveSource {
+                    return false
+                }
+                if classifySource(for: b) == self.lastActiveSource {
+                    return true
+                }
+                return false
+            } ?? playingPlayers[0]
+        } else {
+            // If all players are paused, pick the one that was played most recently
+            chosen = validPlayers.max { a, b in
+                let timeA = lastPlaybackActiveTime(for: a)
+                let timeB = lastPlaybackActiveTime(for: b)
+                if timeA != timeB {
+                    return timeA < timeB
+                }
+                // Tiebreaker: stick with current source if valid
+                if classifySource(for: a) == self.lastActiveSource {
+                    return false
+                }
+                if classifySource(for: b) == self.lastActiveSource {
+                    return true
+                }
+                return false
+            } ?? validPlayers[0]
+        }
+
         applyChosenSidecarPlayer(chosen)
     }
 
@@ -353,9 +364,20 @@ public final class MediaManager: ObservableObject {
         let willPlay = !currentTrack.isPlaying
         currentTrack.isPlaying = willPlay
 
+        let now = Date()
         let targetKey = MediaRemoteBridge.shared.activeTargetKey
+        if !targetKey.isEmpty {
+            playerPlaybackActiveTimes[targetKey] = now
+            if willPlay {
+                playerPlaybackStartTimes[targetKey] = now
+            }
+        }
+        sourcePlaybackActiveTimes[currentTrack.source] = now
+        if willPlay {
+            sourcePlaybackStartTimes[currentTrack.source] = now
+        }
 
-        // Direct AppleScript for Spotify (instant & 100% reliable)
+        // Direct AppleScript for Spotify (strictly isolated to Spotify)
         if currentTrack.source == .spotify {
             DispatchQueue.global(qos: .userInitiated).async {
                 let script = willPlay ? "tell application \"Spotify\" to play" : "tell application \"Spotify\" to pause"
@@ -364,8 +386,15 @@ public final class MediaManager: ObservableObject {
                     appleScript.executeAndReturnError(&error)
                 }
             }
+            if targetKey.lowercased().contains("spotify") {
+                if willPlay {
+                    MediaRemoteBridge.shared.play(targetKey: targetKey)
+                } else {
+                    MediaRemoteBridge.shared.pause(targetKey: targetKey)
+                }
+            }
         } else if currentTrack.source == .appleMusic {
-            // Direct AppleScript for Apple Music (instant & 100% reliable)
+            // Direct AppleScript for Apple Music (strictly isolated to Music)
             DispatchQueue.global(qos: .userInitiated).async {
                 let script = willPlay ? "tell application \"Music\" to play" : "tell application \"Music\" to pause"
                 if let appleScript = NSAppleScript(source: script) {
@@ -373,15 +402,23 @@ public final class MediaManager: ObservableObject {
                     appleScript.executeAndReturnError(&error)
                 }
             }
+            if targetKey.lowercased().contains("music") {
+                if willPlay {
+                    MediaRemoteBridge.shared.play(targetKey: targetKey)
+                } else {
+                    MediaRemoteBridge.shared.pause(targetKey: targetKey)
+                }
+            }
         } else if MediaRemoteBridge.shared.getLatestPlayers().isEmpty {
             // Universal Virtual Media Key fallback
             SystemMediaKeyHelper.sendSystemMediaKey(16) // NX_KEYTYPE_PLAY
-        }
-
-        if willPlay {
-            MediaRemoteBridge.shared.play(targetKey: targetKey)
         } else {
-            MediaRemoteBridge.shared.pause(targetKey: targetKey)
+            // Browser / video players (YouTube, Vidio, Chrome)
+            if willPlay {
+                MediaRemoteBridge.shared.play(targetKey: targetKey)
+            } else {
+                MediaRemoteBridge.shared.pause(targetKey: targetKey)
+            }
         }
 
         WindowManager.shared.updateCompactWidth()
@@ -389,7 +426,14 @@ public final class MediaManager: ObservableObject {
     }
 
     public func nextTrack() {
+        let now = Date()
         let targetKey = MediaRemoteBridge.shared.activeTargetKey
+        if !targetKey.isEmpty {
+            playerPlaybackActiveTimes[targetKey] = now
+            playerPlaybackStartTimes[targetKey] = now
+        }
+        sourcePlaybackActiveTimes[currentTrack.source] = now
+        sourcePlaybackStartTimes[currentTrack.source] = now
 
         if currentTrack.source == .spotify {
             DispatchQueue.global(qos: .userInitiated).async {
@@ -399,7 +443,9 @@ public final class MediaManager: ObservableObject {
                     appleScript.executeAndReturnError(&error)
                 }
             }
-            MediaRemoteBridge.shared.nextTrack(targetKey: targetKey)
+            if targetKey.lowercased().contains("spotify") {
+                MediaRemoteBridge.shared.nextTrack(targetKey: targetKey)
+            }
             keepCursorVisible()
             return
         } else if currentTrack.source == .appleMusic {
@@ -410,7 +456,9 @@ public final class MediaManager: ObservableObject {
                     appleScript.executeAndReturnError(&error)
                 }
             }
-            MediaRemoteBridge.shared.nextTrack(targetKey: targetKey)
+            if targetKey.lowercased().contains("music") {
+                MediaRemoteBridge.shared.nextTrack(targetKey: targetKey)
+            }
             keepCursorVisible()
             return
         }
@@ -431,7 +479,14 @@ public final class MediaManager: ObservableObject {
     }
 
     public func previousTrack() {
+        let now = Date()
         let targetKey = MediaRemoteBridge.shared.activeTargetKey
+        if !targetKey.isEmpty {
+            playerPlaybackActiveTimes[targetKey] = now
+            playerPlaybackStartTimes[targetKey] = now
+        }
+        sourcePlaybackActiveTimes[currentTrack.source] = now
+        sourcePlaybackStartTimes[currentTrack.source] = now
 
         if currentTrack.source == .spotify {
             DispatchQueue.global(qos: .userInitiated).async {
@@ -441,7 +496,9 @@ public final class MediaManager: ObservableObject {
                     appleScript.executeAndReturnError(&error)
                 }
             }
-            MediaRemoteBridge.shared.previousTrack(targetKey: targetKey)
+            if targetKey.lowercased().contains("spotify") {
+                MediaRemoteBridge.shared.previousTrack(targetKey: targetKey)
+            }
             keepCursorVisible()
             return
         } else if currentTrack.source == .appleMusic {
@@ -452,7 +509,9 @@ public final class MediaManager: ObservableObject {
                     appleScript.executeAndReturnError(&error)
                 }
             }
-            MediaRemoteBridge.shared.previousTrack(targetKey: targetKey)
+            if targetKey.lowercased().contains("music") {
+                MediaRemoteBridge.shared.previousTrack(targetKey: targetKey)
+            }
             keepCursorVisible()
             return
         }
