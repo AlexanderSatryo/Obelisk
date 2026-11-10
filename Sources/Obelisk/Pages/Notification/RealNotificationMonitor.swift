@@ -20,11 +20,13 @@ public final class RealNotificationMonitor: ObservableObject {
     private var logProcess: Process?
     private var logPipe: Pipe?
     private var tickCounter: Int = 0
+    private var hasPromptedAccessibilityThisSession: Bool = false
 
     private var lastCapturedSignature: String = ""
     private var lastCapturedTime: Date = .distantPast
 
     private var recentDeliveredIdents: [String: Date] = [:]
+    private var recentMatchedWhatsAppSignatures: [String: Date] = [:]
 
     private struct PendingDelivery {
         let id: UUID
@@ -32,18 +34,11 @@ public final class RealNotificationMonitor: ObservableObject {
         let appName: String
         let ident: String
         let timestamp: Date
-        var postedToService: Bool
         var enrichedWithBannerText: Bool
     }
 
-    private var latestDelivery: PendingDelivery?
-
-    private struct WhatsAppSnapshot {
-        let timestamp: Date
-        let states: [String: String]
-    }
-
-    private var whatsAppSnapshots: [WhatsAppSnapshot] = []
+    private var pendingDeliveries: [PendingDelivery] = []
+    private var baselineWhatsAppStates: [String: String] = [:]
 
     private init() {
         NotificationCenter.default.addObserver(
@@ -60,24 +55,36 @@ public final class RealNotificationMonitor: ObservableObject {
     /// Starts the Accessibility banner poller, WhatsApp state tracker, and real-time `usernoted` log stream monitor.
     public func startMonitoring() {
         isAccessibilityTrusted = AXIsProcessTrusted()
+        if !isAccessibilityTrusted && !hasPromptedAccessibilityThisSession {
+            hasPromptedAccessibilityThisSession = true
+            requestAccessibilityPermission(resetTCC: true)
+        }
 
-        // Capture initial WhatsApp snapshot and backfill any placeholder notifications
-        captureWhatsAppSnapshot()
-        backfillUnenrichedWhatsAppNotifications()
+        // Capture initial WhatsApp baseline once and backfill any placeholder notifications
+        if isAccessibilityTrusted {
+            captureWhatsAppBaseline()
+            backfillUnenrichedWhatsAppNotifications()
+        }
 
         if monitorTimer == nil {
-            monitorTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
+            monitorTimer = Timer.scheduledTimer(withTimeInterval: 0.50, repeats: true) { [weak self] _ in
                 Task { @MainActor in
                     guard let self = self else { return }
                     self.tickCounter += 1
+                    let wasTrusted = self.isAccessibilityTrusted
+                    self.isAccessibilityTrusted = AXIsProcessTrusted()
+
+                    if !wasTrusted && self.isAccessibilityTrusted {
+                        self.captureWhatsAppBaseline()
+                        self.backfillUnenrichedWhatsAppNotifications()
+                    }
+
+                    guard self.isAccessibilityTrusted else { return }
+
                     self.pollNotificationCenterBanners()
-                    // Refresh WhatsApp baseline snapshot roughly every 1.05s when no delivery is actively in-flight
-                    if self.tickCounter % 3 == 0 {
-                        if let pending = self.latestDelivery, Date().timeIntervalSince(pending.timestamp) < 2.2 {
-                            // Keep pre-delivery baseline intact while enriching
-                        } else {
-                            self.captureWhatsAppSnapshot()
-                        }
+
+                    // Every ~2.0s, if any placeholder notification exists, backfill it from WhatsApp
+                    if self.tickCounter % 4 == 0 {
                         if NotificationService.shared.recentNotifications.contains(where: { $0.message == "New notification received" }) {
                             self.backfillUnenrichedWhatsAppNotifications()
                         }
@@ -103,8 +110,8 @@ public final class RealNotificationMonitor: ObservableObject {
     }
 
     /// Prompts macOS to grant Accessibility permission to Obelisk so banner message bodies can be read.
-    public func requestAccessibilityPermission() {
-        if !AXIsProcessTrusted() {
+    public func requestAccessibilityPermission(resetTCC: Bool = false) {
+        if resetTCC && !AXIsProcessTrusted() {
             let resetProc = Process()
             resetProc.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
             resetProc.arguments = ["reset", "Accessibility", "com.alxstry.obelisk"]
@@ -166,8 +173,10 @@ public final class RealNotificationMonitor: ObservableObject {
         guard bundleID.lowercased() != "com.alxstry.obelisk" else { return }
 
         let now = Date()
-        // Clean up old idents (> 15s)
+        // Clean up old idents (> 15s) and old pending deliveries (> 12s)
         recentDeliveredIdents = recentDeliveredIdents.filter { now.timeIntervalSince($0.value) < 15.0 }
+        pendingDeliveries = pendingDeliveries.filter { now.timeIntervalSince($0.timestamp) < 12.0 }
+
         let dedupKey = "\(bundleID)|\(ident)"
         guard recentDeliveredIdents[dedupKey] == nil else { return }
         recentDeliveredIdents[dedupKey] = now
@@ -175,19 +184,31 @@ public final class RealNotificationMonitor: ObservableObject {
         let resolvedAppName = ObeliskNotification.stripBidiControlMarks(Self.resolveAppName(for: bundleID))
         let deliveryID = UUID()
 
-        self.latestDelivery = PendingDelivery(
+        // Post the notification to NotificationService IMMEDIATELY (0ms delay) so the standby notch wings
+        // ([App Icon + App Name] | [New Notifications!]) expand in complete sync with the incoming alert sound.
+        let initialNotification = ObeliskNotification(
+            id: deliveryID,
+            appName: resolvedAppName,
+            bundleIdentifier: bundleID,
+            sender: resolvedAppName,
+            message: "New notification received",
+            timestamp: now
+        )
+        NotificationService.shared.postNotification(initialNotification)
+
+        let pending = PendingDelivery(
             id: deliveryID,
             bundleID: bundleID,
             appName: resolvedAppName,
             ident: ident,
             timestamp: now,
-            postedToService: false,
             enrichedWithBannerText: false
         )
+        pendingDeliveries.append(pending)
 
-        // If this notification is from WhatsApp, poll WhatsApp's live chat list immediately and across short intervals
+        // If this notification is from WhatsApp, poll WhatsApp's live chat list & open message table across short intervals
         if bundleID == "net.whatsapp.WhatsApp" {
-            for delay in [0.05, 0.20, 0.40, 0.75, 1.20] {
+            for delay in [0.04, 0.16, 0.35, 0.65, 1.10, 1.75] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     guard let self = self else { return }
                     self.pollWhatsAppChatList(for: deliveryID)
@@ -196,33 +217,11 @@ public final class RealNotificationMonitor: ObservableObject {
         }
 
         // Poll AX banners across the banner presentation lifecycle (including AvatarViewSnapshotter delay)
-        for delay in [0.15, 0.35, 0.60, 0.95, 1.40, 2.00] {
+        for delay in [0.12, 0.30, 0.55, 0.90, 1.40, 2.00] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 guard let self = self else { return }
                 self.pollNotificationCenterBanners()
             }
-        }
-
-        // Fallback: if neither Engine B nor Engine C yielded text within 0.48s, post the standby alert immediately
-        // so the notch wings animate without delay; subsequent polls (up to 6.0s) will enrich it in-place!
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.48) { [weak self] in
-            guard let self = self,
-                  var pending = self.latestDelivery,
-                  pending.id == deliveryID,
-                  !pending.postedToService else { return }
-
-            pending.postedToService = true
-            self.latestDelivery = pending
-
-            let notification = ObeliskNotification(
-                id: pending.id,
-                appName: pending.appName,
-                bundleIdentifier: pending.bundleID,
-                sender: pending.appName,
-                message: "New notification received",
-                timestamp: pending.timestamp
-            )
-            NotificationService.shared.postNotification(notification)
         }
     }
 
@@ -398,13 +397,13 @@ public final class RealNotificationMonitor: ObservableObject {
         var groupName: String? = nil
 
         let now = Date()
-        let hasRecentDelivery: Bool
-        if let pending = latestDelivery, now.timeIntervalSince(pending.timestamp) < 6.0 {
-            hasRecentDelivery = true
-            resolvedBundleID = pending.bundleID
-            resolvedAppName = pending.appName
+        let pendingIdx = pendingDeliveries.lastIndex(where: {
+            !$0.enrichedWithBannerText && now.timeIntervalSince($0.timestamp) < 6.0
+        })
+        if let idx = pendingIdx {
+            resolvedBundleID = pendingDeliveries[idx].bundleID
+            resolvedAppName = pendingDeliveries[idx].appName
         } else {
-            hasRecentDelivery = false
             resolvedAppName = descHeaderApp
         }
 
@@ -484,37 +483,21 @@ public final class RealNotificationMonitor: ObservableObject {
 
         guard resolvedAppName != "Obelisk", !message.isEmpty else { return false }
 
-        if hasRecentDelivery, var pending = latestDelivery, !pending.enrichedWithBannerText {
-            pending.enrichedWithBannerText = true
+        if let idx = pendingIdx {
+            let deliveryID = pendingDeliveries[idx].id
+            pendingDeliveries[idx].enrichedWithBannerText = true
             lastCapturedSignature = "\(resolvedAppName)|\(sender)|\(message)"
             lastCapturedTime = now
 
-            if pending.postedToService {
-                self.latestDelivery = pending
-                NotificationService.shared.enrichNotification(
-                    id: pending.id,
-                    appName: resolvedAppName,
-                    bundleIdentifier: resolvedBundleID,
-                    sender: sender,
-                    message: message,
-                    groupName: groupName
-                )
-                return true
-            } else {
-                pending.postedToService = true
-                self.latestDelivery = pending
-                let notification = ObeliskNotification(
-                    id: pending.id,
-                    appName: resolvedAppName,
-                    bundleIdentifier: resolvedBundleID,
-                    sender: sender,
-                    message: message,
-                    timestamp: now,
-                    groupName: groupName
-                )
-                NotificationService.shared.postNotification(notification)
-                return true
-            }
+            NotificationService.shared.enrichNotification(
+                id: deliveryID,
+                appName: resolvedAppName,
+                bundleIdentifier: resolvedBundleID,
+                sender: sender,
+                message: message,
+                groupName: groupName
+            )
+            return true
         }
 
         let signature = "\(resolvedAppName)|\(sender)|\(message)"
@@ -537,7 +520,7 @@ public final class RealNotificationMonitor: ObservableObject {
         return true
     }
 
-    // MARK: - Engine 3: Direct WhatsApp Catalyst `ChatListView_TableView` AX Inspector
+    // MARK: - Engine 3: Direct WhatsApp Catalyst `ChatListView_TableView` & `ChatMessagesTableView` AX Inspector
 
     private struct ParsedWhatsAppRow {
         let chatTitle: String
@@ -552,95 +535,95 @@ public final class RealNotificationMonitor: ObservableObject {
         let groupName: String?
     }
 
-    private func captureWhatsAppSnapshot() {
-        let rows = readWhatsAppChatRows()
+    private func captureWhatsAppBaseline() {
+        let rows = readWhatsAppChatRows(includeOpenChatBubbles: false)
         guard !rows.isEmpty else { return }
         var stateMap: [String: String] = [:]
         for row in rows {
             stateMap[row.chatTitle] = row.rawState
         }
-        let now = Date()
-        whatsAppSnapshots.append(WhatsAppSnapshot(timestamp: now, states: stateMap))
-        whatsAppSnapshots = whatsAppSnapshots.filter { now.timeIntervalSince($0.timestamp) < 8.0 }
+        baselineWhatsAppStates = stateMap
     }
 
     private func pollWhatsAppChatList(for deliveryID: UUID) {
-        guard var pending = latestDelivery,
-              pending.id == deliveryID,
-              !pending.enrichedWithBannerText else { return }
+        guard let idx = pendingDeliveries.firstIndex(where: { $0.id == deliveryID }),
+              !pendingDeliveries[idx].enrichedWithBannerText else { return }
 
-        let rows = readWhatsAppChatRows()
-        guard !rows.isEmpty else { return }
+        let allRows = readWhatsAppChatRows(includeOpenChatBubbles: true)
+        let receivedRows = allRows.filter { !$0.isSentByMe && !$0.message.isEmpty }
+        guard !receivedRows.isEmpty else { return }
 
-        // Select baseline snapshot from at least 1.0s before the notification delivery
-        let baseline = whatsAppSnapshots.last(where: {
-            pending.timestamp.timeIntervalSince($0.timestamp) >= 0.8
-        }) ?? whatsAppSnapshots.first
+        let now = Date()
+        recentMatchedWhatsAppSignatures = recentMatchedWhatsAppSignatures.filter {
+            now.timeIntervalSince($0.value) < 45.0
+        }
+
+        func sig(_ row: ParsedWhatsAppRow) -> String {
+            "\(row.sender)|\(row.groupName ?? "")|\(row.message)|\(row.timeToken)"
+        }
+
+        func isUnused(_ row: ParsedWhatsAppRow) -> Bool {
+            recentMatchedWhatsAppSignatures[sig(row)] == nil
+        }
 
         var matchedRow: ParsedWhatsAppRow? = nil
 
-        // 1. Check if any received row changed state compared to our pre-delivery baseline
-        if let baseline = baseline {
-            matchedRow = rows.first(where: { row in
-                !row.isSentByMe && baseline.states[row.chatTitle] != row.rawState
+        // 1. Unused received row whose state changed relative to baseline
+        if !baselineWhatsAppStates.isEmpty {
+            matchedRow = receivedRows.first(where: { row in
+                isUnused(row) && baselineWhatsAppStates[row.chatTitle] != row.rawState
             })
         }
 
-        // 2. Check for an unread received row whose timestamp matches the current minute
+        // 2. Unused unread received row matching the current minute
         if matchedRow == nil {
-            matchedRow = rows.first(where: { !$0.isSentByMe && $0.isUnread && $0.matchesCurrentMinute })
+            matchedRow = receivedRows.first(where: { isUnused($0) && $0.isUnread && $0.matchesCurrentMinute })
         }
 
-        // 3. Check for any received row (including an open chat in the right pane) whose timestamp matches the current minute
+        // 3. Unused received row (including open chat message bubbles) matching the current minute
         if matchedRow == nil {
-            matchedRow = rows.first(where: { !$0.isSentByMe && $0.matchesCurrentMinute })
+            matchedRow = receivedRows.first(where: { isUnused($0) && $0.matchesCurrentMinute })
         }
 
-        // 4. Fallback to the top unread received row
+        // 4. Unused unread received row
         if matchedRow == nil {
-            matchedRow = rows.first(where: { !$0.isSentByMe && $0.isUnread && !$0.isPinned })
-                ?? rows.first(where: { !$0.isSentByMe && $0.isUnread })
+            matchedRow = receivedRows.first(where: { isUnused($0) && $0.isUnread && !$0.isPinned })
+                ?? receivedRows.first(where: { isUnused($0) && $0.isUnread })
         }
 
-        // 5. Fallback to the top unpinned received row
+        // 5. Any received row matching the current minute
         if matchedRow == nil {
-            matchedRow = rows.first(where: { !$0.isSentByMe && !$0.isPinned })
+            matchedRow = receivedRows.first(where: { $0.matchesCurrentMinute && $0.isUnread })
+                ?? receivedRows.first(where: { $0.matchesCurrentMinute })
         }
 
-        guard let winner = matchedRow, !winner.message.isEmpty else { return }
-
-        pending.enrichedWithBannerText = true
-        if pending.postedToService {
-            self.latestDelivery = pending
-            NotificationService.shared.enrichNotification(
-                id: pending.id,
-                appName: "WhatsApp",
-                bundleIdentifier: "net.whatsapp.WhatsApp",
-                sender: winner.sender,
-                message: winner.message,
-                groupName: winner.groupName
-            )
-        } else {
-            pending.postedToService = true
-            self.latestDelivery = pending
-            let notification = ObeliskNotification(
-                id: pending.id,
-                appName: "WhatsApp",
-                bundleIdentifier: "net.whatsapp.WhatsApp",
-                sender: winner.sender,
-                message: winner.message,
-                timestamp: pending.timestamp,
-                groupName: winner.groupName
-            )
-            NotificationService.shared.postNotification(notification)
+        // 6. Top unread or unpinned received row
+        if matchedRow == nil {
+            matchedRow = receivedRows.first(where: { $0.isUnread && !$0.isPinned })
+                ?? receivedRows.first(where: { $0.isUnread })
+                ?? receivedRows.first(where: { !$0.isPinned })
         }
 
-        captureWhatsAppSnapshot()
+        guard let winner = matchedRow else { return }
+
+        pendingDeliveries[idx].enrichedWithBannerText = true
+        recentMatchedWhatsAppSignatures[sig(winner)] = now
+
+        NotificationService.shared.enrichNotification(
+            id: deliveryID,
+            appName: "WhatsApp",
+            bundleIdentifier: "net.whatsapp.WhatsApp",
+            sender: winner.sender,
+            message: winner.message,
+            groupName: winner.groupName
+        )
+
+        captureWhatsAppBaseline()
     }
 
     /// Backfills any existing WhatsApp notifications in `recentNotifications` that still have `"New notification received"`.
     public func backfillUnenrichedWhatsAppNotifications() {
-        let rows = readWhatsAppChatRows().filter { !$0.isSentByMe }
+        let rows = readWhatsAppChatRows(includeOpenChatBubbles: true).filter { !$0.isSentByMe && !$0.message.isEmpty }
         guard !rows.isEmpty else { return }
 
         let unreadOrRecent = rows.filter { $0.isUnread } + rows.filter { !$0.isUnread && !$0.isPinned } + rows.filter { !$0.isUnread && $0.isPinned }
@@ -684,63 +667,83 @@ public final class RealNotificationMonitor: ObservableObject {
         }
     }
 
-    private func readWhatsAppChatRows() -> [ParsedWhatsAppRow] {
+    private func resolveWhatsAppRootWindow(for axApp: AXUIElement) -> AXUIElement {
+        var mainWinRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &mainWinRef) == .success,
+           let mainWin = mainWinRef {
+            return mainWin as! AXUIElement
+        }
+        var focusedWinRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &focusedWinRef) == .success,
+           let focusedWin = focusedWinRef {
+            return focusedWin as! AXUIElement
+        }
+        var windowsRef: CFTypeRef?
+        if AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+           let windows = windowsRef as? [AXUIElement],
+           let firstWin = windows.first {
+            return firstWin
+        }
+        return axApp
+    }
+
+    private func readWhatsAppChatRows(includeOpenChatBubbles: Bool = true) -> [ParsedWhatsAppRow] {
         guard AXIsProcessTrusted() else { return [] }
         let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "net.whatsapp.WhatsApp")
         guard let app = apps.first else { return [] }
 
         let axApp = AXUIElementCreateApplication(app.processIdentifier)
-        AXUIElementSetAttributeValue(axApp, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
-
-        var candidateRoots: [AXUIElement] = []
-        var mainWinRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &mainWinRef) == .success,
-           let mainWin = mainWinRef {
-            candidateRoots.append(mainWin as! AXUIElement)
-        }
-        var focusedWinRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &focusedWinRef) == .success,
-           let focusedWin = focusedWinRef {
-            candidateRoots.append(focusedWin as! AXUIElement)
-        }
-        var windowsRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
-           let windows = windowsRef as? [AXUIElement] {
-            candidateRoots.append(contentsOf: windows)
-        }
-        candidateRoots.append(axApp)
-
-        var tableElement: AXUIElement?
-        for root in candidateRoots {
-            if let found = findAXElement(withIdentifier: "ChatListView_TableView", in: root) {
-                tableElement = found
-                break
-            }
-        }
-
-        guard let table = tableElement else {
-            return []
-        }
-
-        var childrenRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(table, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-              let children = childrenRef as? [AXUIElement] else {
-            return []
-        }
-
+        let rootWindow = resolveWhatsAppRootWindow(for: axApp)
         let currentTimeTokens = Self.timeTokens(for: Date())
         var parsedRows: [ParsedWhatsAppRow] = []
 
-        for row in children.prefix(15) {
-            var descRef: CFTypeRef?
-            var valRef: CFTypeRef?
-            AXUIElementCopyAttributeValue(row, kAXDescriptionAttribute as CFString, &descRef)
-            AXUIElementCopyAttributeValue(row, kAXValueAttribute as CFString, &valRef)
+        // 1. Read open chat message bubbles from `ChatMessagesTableView` (newest first) so rapid messages
+        //    in an active conversation are all captured even if the user immediately replies.
+        if includeOpenChatBubbles,
+           let msgTable = findAXElement(withIdentifier: "ChatMessagesTableView", in: rootWindow) {
+            var tableDescRef: CFTypeRef?
+            var cellsRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(msgTable, kAXDescriptionAttribute as CFString, &tableDescRef)
+            AXUIElementCopyAttributeValue(msgTable, kAXChildrenAttribute as CFString, &cellsRef)
 
-            let rawDesc = descRef as? String ?? ""
-            let rawVal = valRef as? String ?? ""
-            if let parsed = parseWhatsAppRow(desc: rawDesc, val: rawVal, currentTimeTokens: currentTimeTokens) {
-                parsedRows.append(parsed)
+            let rawTableDesc = ObeliskNotification.stripBidiControlMarks(tableDescRef as? String ?? "")
+            let prefix = "Messages in chat with "
+            let openChatTitle = rawTableDesc.hasPrefix(prefix)
+                ? ObeliskNotification.stripBidiControlMarks(String(rawTableDesc.dropFirst(prefix.count)))
+                : ""
+
+            if !openChatTitle.isEmpty, openChatTitle != "You",
+               let cells = cellsRef as? [AXUIElement] {
+                for cell in cells.suffix(10).reversed() {
+                    var cellDescRef: CFTypeRef?
+                    AXUIElementCopyAttributeValue(cell, kAXDescriptionAttribute as CFString, &cellDescRef)
+                    let rawCellDesc = cellDescRef as? String ?? ""
+                    guard !rawCellDesc.isEmpty else { continue }
+                    if let parsed = parseWhatsAppRow(desc: openChatTitle, val: rawCellDesc, currentTimeTokens: currentTimeTokens),
+                       !parsed.isSentByMe {
+                        parsedRows.append(parsed)
+                    }
+                }
+            }
+        }
+
+        // 2. Read chat list rows from `ChatListView_TableView`
+        if let table = findAXElement(withIdentifier: "ChatListView_TableView", in: rootWindow) {
+            var childrenRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(table, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+               let children = childrenRef as? [AXUIElement] {
+                for row in children.prefix(15) {
+                    var descRef: CFTypeRef?
+                    var valRef: CFTypeRef?
+                    AXUIElementCopyAttributeValue(row, kAXDescriptionAttribute as CFString, &descRef)
+                    AXUIElementCopyAttributeValue(row, kAXValueAttribute as CFString, &valRef)
+
+                    let rawDesc = descRef as? String ?? ""
+                    let rawVal = valRef as? String ?? ""
+                    if let parsed = parseWhatsAppRow(desc: rawDesc, val: rawVal, currentTimeTokens: currentTimeTokens) {
+                        parsedRows.append(parsed)
+                    }
+                }
             }
         }
 
