@@ -23,7 +23,6 @@ public final class MediaManager: ObservableObject {
 
     private var lastActiveSource: PlayerSource = .none
     private var preferredSourceOverride: PlayerSource? = nil
-    private var cachedSpotifyImage: NSImage?
     private var lastManualSeekTime: Date = .distantPast
     private var manualSeekTargetPosition: Double = 0
     private var lastUserToggleTime: Date = .distantPast
@@ -85,7 +84,6 @@ public final class MediaManager: ObservableObject {
             self.currentTrack = .empty
             self.artworkImage = nil
             self.sourceLogoImage = nil
-            self.cachedSpotifyImage = nil
             WindowManager.shared.updateCompactWidth()
         }
     }
@@ -308,29 +306,23 @@ public final class MediaManager: ObservableObject {
 
         // Resolve real video thumbnail / song cover from sidecar's 600x600 artwork file
         let artKey = "\(source.rawValue)|\(cleanTitle)|\(cleanArtist)|\(state.artworkPath)"
-        if !state.artworkPath.isEmpty,
-           (self.lastLoadedArtworkPath != state.artworkPath || self.artworkImage == nil),
-           let img = NSImage(contentsOfFile: state.artworkPath) {
-            self.artworkImage = img
+        if self.lastArtworkKey != artKey || self.artworkImage == nil {
+            self.lastArtworkKey = artKey
             self.lastLoadedArtworkPath = state.artworkPath
-            self.lastArtworkKey = artKey
-            if source == .spotify {
-                self.cachedSpotifyImage = img
-            }
-        } else if state.artworkPath.isEmpty && self.lastArtworkKey != artKey {
-            self.lastArtworkKey = artKey
-            self.lastLoadedArtworkPath = ""
-            self.artworkImage = nil
-            MediaArtworkService.shared.resolveTrackArtwork(
-                title: cleanTitle,
-                artist: cleanArtist,
-                source: source
-            ) { [weak self] fetched in
-                guard let self = self, self.currentTrack.title == cleanTitle else { return }
-                if let fetched = fetched {
+
+            if !state.artworkPath.isEmpty,
+               let data = try? Data(contentsOf: URL(fileURLWithPath: state.artworkPath)),
+               let img = NSImage(data: data) {
+                self.artworkImage = img
+            } else {
+                self.artworkImage = nil
+                MediaArtworkService.shared.resolveTrackArtwork(
+                    title: cleanTitle,
+                    artist: cleanArtist,
+                    source: source
+                ) { [weak self] fetched in
+                    guard let self = self, self.currentTrack.title == cleanTitle else { return }
                     self.artworkImage = fetched
-                } else if source == .spotify, let cached = self.cachedSpotifyImage {
-                    self.artworkImage = cached
                 }
             }
         }

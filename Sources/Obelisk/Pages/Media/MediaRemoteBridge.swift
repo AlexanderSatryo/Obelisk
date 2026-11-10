@@ -272,8 +272,9 @@ func pollAllPlayers(forceArtwork: Bool = false) {
                             pos = min(max(pos, 0), dur)
                         }
 
-                        if lastArtTitleByKey[key] != title {
-                            lastArtTitleByKey[key] = title
+                        let trackIdent = "\(title)_\(artist)"
+                        if lastArtTitleByKey[key] != trackIdent {
+                            lastArtTitleByKey[key] = trackIdent
                             lastArtPathByKey.removeValue(forKey: key)
                         }
 
@@ -285,7 +286,8 @@ func pollAllPlayers(forceArtwork: Bool = false) {
                                 .replacingOccurrences(of: "/", with: "_")
                                 .replacingOccurrences(of: "|", with: "_")
                                 .replacingOccurrences(of: " ", with: "_")
-                            let path = "/tmp/obelisk_art_\(safeName).tiff"
+                            let titleHash = String(abs(trackIdent.hashValue), radix: 16)
+                            let path = "/tmp/obelisk_art_\(safeName)_\(titleHash).tiff"
                             try? imgData.write(to: URL(fileURLWithPath: path))
                             lastArtPathByKey[key] = path
                             artPath = path
