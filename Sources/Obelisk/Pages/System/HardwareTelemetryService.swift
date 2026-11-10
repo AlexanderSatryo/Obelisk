@@ -51,6 +51,8 @@ public final class HardwareTelemetryService: ObservableObject {
 
     private var telemetryTimer: Timer?
     private var powerRunLoopSource: CFRunLoopSource?
+    private var smartBatteryNotifyPort: IONotificationPortRef?
+    private var smartBatteryNotification: io_object_t = 0
     private var previousCPUTicks: [Int32] = []
     private var hasInitializedPowerState: Bool = false
     private var hasNotifiedFullyCharged: Bool = false
@@ -166,6 +168,42 @@ public final class HardwareTelemetryService: ObservableObject {
         }, context)?.takeRetainedValue() {
             CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
             self.powerRunLoopSource = source
+        }
+
+        // Direct kernel-level AppleSmartBattery notification (<10ms response on cable plug/unplug)
+        let masterPort: mach_port_t
+        if #available(macOS 12.0, *) {
+            masterPort = kIOMainPortDefault
+        } else {
+            masterPort = kIOMasterPortDefault
+        }
+        let service = IOServiceGetMatchingService(masterPort, IOServiceMatching("AppleSmartBattery"))
+        if service != 0 {
+            if let port = IONotificationPortCreate(masterPort) {
+                self.smartBatteryNotifyPort = port
+                if let rlSource = IONotificationPortGetRunLoopSource(port)?.takeUnretainedValue() {
+                    CFRunLoopAddSource(CFRunLoopGetMain(), rlSource, .commonModes)
+                }
+                var notif: io_object_t = 0
+                let kr = IOServiceAddInterestNotification(
+                    port,
+                    service,
+                    kIOGeneralInterest,
+                    { refcon, _, _, _ in
+                        guard let refcon = refcon else { return }
+                        let instance = Unmanaged<HardwareTelemetryService>.fromOpaque(refcon).takeUnretainedValue()
+                        Task { @MainActor in
+                            instance.updateBatteryMetrics(isInitial: false)
+                        }
+                    },
+                    context,
+                    &notif
+                )
+                if kr == KERN_SUCCESS {
+                    self.smartBatteryNotification = notif
+                }
+            }
+            IOObjectRelease(service)
         }
     }
 
@@ -322,18 +360,29 @@ public final class HardwareTelemetryService: ObservableObject {
         let maxCap = max(1, (desc[kIOPSMaxCapacityKey as String] as? Int) ?? 100)
         let pct = Int(round((Double(currentCap) / Double(maxCap)) * 100.0))
 
+        let smartDict = readSmartBatteryDictionary()
+        let smartExtConnected = (smartDict?["ExternalConnected"] as? Bool) == true || (smartDict?["AppleRawExternalConnected"] as? Bool) == true
+        let smartIsCharging = (smartDict?["IsCharging"] as? Bool) == true
+
         let powerState = (desc[kIOPSPowerSourceStateKey as String] as? String) ?? ""
-        let pluggedIn = (powerState == (kIOPSACPowerValue as String))
-        let charging = (desc[kIOPSIsChargingKey as String] as? Bool) ?? false
+        let pluggedIn = (powerState == (kIOPSACPowerValue as String)) || smartExtConnected
+        let isCharged = (pct >= 100) || ((desc[kIOPSIsChargedKey as String] as? Bool) == true)
+        let rawCharging = ((desc[kIOPSIsChargingKey as String] as? Bool) ?? false) || smartIsCharging
+        // Treat pluggedIn with <100% as immediately charging so there is zero delay while PMU negotiates current
+        let charging = rawCharging || (pluggedIn && !isCharged)
 
         var timeMins: Int? = nil
         if charging {
             if let ttf = desc[kIOPSTimeToFullChargeKey as String] as? Int, ttf > 0 && ttf < 1500 {
                 timeMins = ttf
+            } else {
+                timeMins = estimateTimeToFullCharge(pct: pct, smartDict: smartDict)
             }
         } else if !pluggedIn {
             if let tte = desc[kIOPSTimeToEmptyKey as String] as? Int, tte > 0 && tte < 1500 {
                 timeMins = tte
+            } else {
+                timeMins = estimateTimeToEmpty(pct: pct, smartDict: smartDict)
             }
         }
 
@@ -347,10 +396,10 @@ public final class HardwareTelemetryService: ObservableObject {
             } else if pct >= 100 {
                 statusStr = "100% • Fully Charged"
             } else {
-                statusStr = "\(pct)% • Calculating..."
+                statusStr = "\(pct)% • Charging"
             }
         } else if pluggedIn {
-            statusStr = "\(pct)% • Power Adapter"
+            statusStr = pct >= 100 ? "100% • Fully Charged" : "\(pct)% • Power Adapter"
         } else {
             if let mins = timeMins {
                 let h = mins / 60
@@ -370,7 +419,17 @@ public final class HardwareTelemetryService: ObservableObject {
         self.timeRemainingMinutes = timeMins
         self.batteryStatusText = statusStr
 
-        let isChargedNow = pluggedIn && (pct >= 100 || (desc[kIOPSIsChargedKey as String] as? Bool) == true)
+        // Keep any currently visible battery HUD updated with the latest time estimate
+        if case .battery(_, let hudCharging, let hudStatus) = self.activeTransientHUD,
+           hudCharging == charging,
+           hudStatus != "Disconnected",
+           hudStatus != "Fully Charged",
+           hudStatus != "Low Battery",
+           hudStatus != statusStr {
+            self.activeTransientHUD = .battery(percentage: pct, isCharging: charging, statusText: statusStr)
+        }
+
+        let isChargedNow = pluggedIn && isCharged
 
         if !pluggedIn || pct < 98 {
             self.hasNotifiedFullyCharged = false
@@ -475,5 +534,68 @@ public final class HardwareTelemetryService: ObservableObject {
                 }
             } catch {}
         }
+    }
+
+    // MARK: - Instant Battery Charging/Depletion Estimator
+
+    private func readSmartBatteryDictionary() -> [String: Any]? {
+        let masterPort: mach_port_t
+        if #available(macOS 12.0, *) {
+            masterPort = kIOMainPortDefault
+        } else {
+            masterPort = kIOMasterPortDefault
+        }
+
+        let service = IOServiceGetMatchingService(masterPort, IOServiceMatching("AppleSmartBattery"))
+        guard service != 0 else { return nil }
+        defer { IOObjectRelease(service) }
+
+        var props: Unmanaged<CFMutableDictionary>?
+        if IORegistryEntryCreateCFProperties(service, &props, kCFAllocatorDefault, 0) == KERN_SUCCESS,
+           let dict = props?.takeRetainedValue() as? [String: Any] {
+            return dict
+        }
+        return nil
+    }
+
+    private func estimateTimeToFullCharge(pct: Int, smartDict: [String: Any]? = nil) -> Int? {
+        if pct >= 100 { return nil }
+
+        // 1. Try reading AppleSmartBattery directly from IOKit registry
+        if let dict = smartDict ?? readSmartBatteryDictionary() {
+            if let avg = dict["AvgTimeToFull"] as? Int, avg > 0 && avg < 1500 {
+                return avg
+            }
+            if let bData = dict["BatteryData"] as? [String: Any],
+               let fullCap = bData["FullChargeCapacity"] as? Int,
+               let remCap = bData["RemainingCapacity"] as? Int,
+               let amp = dict["InstantAmperage"] as? Int, amp > 300 {
+                let needed = max(0, fullCap - remCap)
+                let hours = Double(needed) / Double(amp)
+                let mins = Int(round(hours * 60.0))
+                let padded = pct > 80 ? Int(Double(mins) * 1.35) : mins
+                if padded > 5 && padded < 1500 {
+                    return padded
+                }
+            }
+        }
+
+        // 2. Instant curve fallback (Apple Silicon fast charge curve: ~1.15 min/% up to 80%, ~1.75 min/% above 80%)
+        let remaining = max(0, 100 - pct)
+        if remaining <= 0 { return nil }
+        let fastPhase = max(0, min(remaining, max(0, 80 - pct)))
+        let saturationPhase = remaining - fastPhase
+        let estMins = Int(round(Double(fastPhase) * 1.15 + Double(saturationPhase) * 1.75))
+        return max(5, min(estMins, 240))
+    }
+
+    private func estimateTimeToEmpty(pct: Int, smartDict: [String: Any]? = nil) -> Int? {
+        if pct <= 0 { return nil }
+        if let dict = smartDict ?? readSmartBatteryDictionary(),
+           let avgEmpty = dict["AvgTimeToEmpty"] as? Int, avgEmpty > 0 && avgEmpty < 1500 {
+            return avgEmpty
+        }
+        let estMins = Int(round(Double(pct) * 7.2))
+        return max(10, estMins)
     }
 }

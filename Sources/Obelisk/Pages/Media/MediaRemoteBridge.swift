@@ -375,7 +375,7 @@ func executeCommandLine(_ line: String) {
         }
     }
 
-    if ctrl == nil {
+    if ctrl == nil && targetKey.isEmpty {
         ctrl = controllers.values.first
     }
 
@@ -394,7 +394,7 @@ func executeCommandLine(_ line: String) {
                 }
             }
         }
-    } else {
+    } else if targetKey.isEmpty {
         _ = globalSendCmd?(cmdInt, opts)
         for delay in [0.08, 0.25] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {

@@ -596,7 +596,7 @@ public struct NotchTransientHUDBar: View {
             }
         }
         if isCharging {
-            return pct >= 100 ? "Fully Charged" : "Calculating..."
+            return pct >= 100 ? "Fully Charged" : "Charging"
         }
         return "On Battery"
     }
