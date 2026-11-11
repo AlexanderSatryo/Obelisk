@@ -1409,70 +1409,87 @@ public struct SettingsView: View {
             ? previewTab
             : (activeDraft.enabledTabs.first ?? .media)
 
-        HStack {
-            HStack(spacing: 5) {
-                Image(systemName: "display")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.50))
-                Text("LIVE NOTCH PREVIEW")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.50))
-                    .tracking(0.6)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center) {
+                HStack(spacing: 5) {
+                    Image(systemName: "display")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.50))
+                    Text("LIVE NOTCH PREVIEW")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.50))
+                        .tracking(0.6)
+                }
+
+                Spacer()
+
+                Button(action: {
+                    if isPreviewFrozen {
+                        isPreviewFrozen = false
+                        frozenDraft = nil
+                    } else {
+                        frozenDraft = draft
+                        isPreviewFrozen = true
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: isPreviewFrozen ? "lock.fill" : "lock.open")
+                            .font(.system(size: 8.5))
+                        Text(isPreviewFrozen ? "Frozen" : "Live")
+                            .font(.system(size: 9.5, weight: .medium))
+                    }
+                    .foregroundColor(isPreviewFrozen ? .white : .white.opacity(0.65))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3.5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(isPreviewFrozen ? Color.white.opacity(0.18) : Color.white.opacity(0.06))
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Picker("", selection: $previewExpandedState) {
+                    Text("Compact").tag(false)
+                    Text("Expanded").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 140)
             }
 
-            Spacer()
-
             if previewExpandedState {
-                HStack(spacing: 3) {
+                HStack(spacing: 6) {
+                    Text("Preview Tab:")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.40))
+
                     ForEach(activeDraft.enabledTabs, id: \.rawValue) { tab in
                         let isCurrentTab = (effectivePreviewTab == tab)
                         Button(action: {
                             previewTab = tab
                         }) {
-                            Text(tab.title)
-                                .font(.system(size: 10, weight: isCurrentTab ? .semibold : .regular))
-                                .foregroundColor(isCurrentTab ? .white : .white.opacity(0.55))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(isCurrentTab ? Color.white.opacity(0.12) : Color.clear)
-                                .cornerRadius(5)
+                            HStack(spacing: 4) {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 8.5))
+                                Text(tab.title)
+                                    .font(.system(size: 10, weight: isCurrentTab ? .semibold : .regular))
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }
+                            .foregroundColor(isCurrentTab ? .white : .white.opacity(0.60))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3.5)
+                            .background(
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .fill(isCurrentTab ? Color.white.opacity(0.14) : Color.white.opacity(0.04))
+                            )
                         }
                         .buttonStyle(.plain)
                     }
-                }
-            }
 
-            Button(action: {
-                if isPreviewFrozen {
-                    isPreviewFrozen = false
-                    frozenDraft = nil
-                } else {
-                    frozenDraft = draft
-                    isPreviewFrozen = true
+                    Spacer()
                 }
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: isPreviewFrozen ? "lock.fill" : "lock.open")
-                        .font(.system(size: 8.5))
-                    Text(isPreviewFrozen ? "Frozen" : "Live")
-                        .font(.system(size: 9.5, weight: .medium))
-                }
-                .foregroundColor(isPreviewFrozen ? .white : .white.opacity(0.65))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3.5)
-                .background(
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(isPreviewFrozen ? Color.white.opacity(0.18) : Color.white.opacity(0.06))
-                )
+                .transition(.opacity)
             }
-            .buttonStyle(.plain)
-
-            Picker("", selection: $previewExpandedState) {
-                Text("Compact").tag(false)
-                Text("Expanded").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 140)
         }
     }
 
