@@ -7,43 +7,45 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
 ## Features
 
 1. **Notch Display and Customization**
-   - Automatically detects and aligns with the MacBook notch dimensions.
-   - Expand and collapse smoothly by hovering your mouse or clicking.
-   - Customize the standby notch width in Settings (from 40 to 380 pt) with a live preview and discard button.
-   - Content on the left and right sides stays centered regardless of the width you choose.
+   - Automatically detects and aligns with native MacBook notch dimensions (and simulates on external displays).
+   - Expand and collapse smoothly via hover, click, or trackpad gestures.
+   - Independent Appearance controls in Settings:
+     - **Compact Notch**: Customize standby width (40 to 380 pt) with live preview and centered side content.
+     - **Expanded Dashboard**: Configure layout dimensions and animation parameters.
+   - Horizontal multi-page swipe navigation with natural gesture direction enabled by default.
 
-2. **Incoming Notifications and Privacy**
-   - Displays incoming notifications (such as WhatsApp, Messages, and other apps) directly at the notch.
-   - Private notification content can be unlocked using Touch ID.
-   - Includes a notification history tab to view recent alerts and open their source applications with one click.
+2. **Incoming Notifications and Touch ID Privacy**
+   - Displays real-time notification banners (WhatsApp, Messages, Slack, Telegram, etc.) directly in the notch.
+   - Biometric privacy protection: Private message contents unlock with Touch ID, featuring an illuminated green fingerprint glyph and sonar ripple animation.
+   - Built-in notification history tab to review recent alerts and open originating apps in one click.
 
 3. **Media Player and Synchronized Lyrics**
-   - Supports Spotify, Apple Music, YouTube, and other browsers and media players.
-   - Displays the current song title, artist, album art, and progress bar.
-   - Real-time synchronized lyrics that scroll automatically with the music.
-   - Audio output selector to quickly switch between MacBook speakers, AirPods, and Bluetooth devices.
+   - Integrates with Spotify, Apple Music, YouTube, and media-playing browsers.
+   - Displays track title, artist name, live album artwork, and interactive scrubber.
+   - Real-time synchronized lyrics scrolling with playback timing.
+   - Audio output selector for rapid switching between built-in speakers, AirPods, and Bluetooth devices.
 
-4. **File Tray**
-   - Drag and drop files or folders to the notch to temporarily store them.
-   - Drag stored files out to other applications (Finder, WhatsApp, Slack, etc.) or share directly via AirDrop.
+4. **File Tray and Direct Drag Interaction**
+   - Dragging any file or folder toward the notch automatically opens the File Tray page.
+   - Temporarily stages dragged files for quick access.
+   - Drag staged files directly into other applications (Finder, Mail, Slack, WhatsApp) or share via AirDrop.
 
 5. **Download Progress Tracking**
-   - Tracks active browser downloads from Safari, Chrome, Brave, Arc, and Firefox.
-   - Displays a smooth progress bar that fills from left to right with download percentage (`%`) and file name.
-   - Automatically dismisses when a download is cancelled or paused.
-   - Shows a notification banner when a download finishes.
+   - Actively monitors file downloads from Safari, Chrome, Brave, Arc, and Firefox.
+   - Displays a live progress bar with completion percentage and file name.
+   - Automatically cleans up on download completion, cancellation, or pause.
+   - Alerts with a completion notification banner once the file is ready.
 
 6. **Weather and Calendar**
-   - Weather: Shows current temperature, weather conditions, wind speed, humidity, and hourly forecast.
-   - Calendar: Shows upcoming events, dates, and schedules from Apple Calendar.
+   - Weather: Real-time temperature, condition indicators, humidity, wind velocity, and hourly forecast.
+   - Calendar: Displays upcoming schedule, event timings, and meeting details synced from Apple Calendar.
 
-7. **System Indicators**
-   - Replaces default screen pop-ups with compact indicators at the notch:
-     - Volume level with smart audio device icons (headphones vs speakers) and connected device names.
-     - Screen brightness level.
-     - Battery percentage, charger connection, disconnect alert, and fully charged alert.
-     - Caps Lock status.
-   - Quick camera mirror to preview your front camera directly from the notch.
+7. **System Indicators and Native HUD Replacement**
+   - **Native macOS OSD Interception**: Suppresses standard floating pop-up overlays for volume and brightness, rendering them smoothly inside the notch instead.
+   - **Smart Audio Output Recognition**: Distinguishes between headphones (earbuds, AirPods, headsets) and speakers (built-in speakers, Bluetooth speakers, external audio) with tailored icons and displays the active device name.
+   - **Flicker-Free HUD Slider**: Smooth fluid slider transitions during repeated keystrokes with zero view blinking or notch jitter.
+   - **System Telemetry**: Real-time notch badges for battery percentage, charging state, disconnect alerts, and Caps Lock status.
+   - **Quick Camera Mirror**: Instant front camera preview toggle directly from the notch.
 
 ---
 
