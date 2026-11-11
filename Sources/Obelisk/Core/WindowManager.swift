@@ -133,38 +133,37 @@ public final class WindowManager: ObservableObject {
         startUnifiedCursorMonitor()
     }
 
-    /// Dynamically computes the balanced wing width based on the download filename and status text,
-    /// ensuring content is centered with comfortable breathing room between the physical bezel and outer edge.
+    /// Dynamically computes the balanced wing width based on the download filename, speed and status,
+    /// guaranteeing that both left and right wings open with the EXACT same symmetrical width.
     public func computeDownloadWingWidth(fileName: String, statusText: String?, progress: Double?) -> CGFloat {
         let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        let nameWidth = ceil((fileName as NSString).size(withAttributes: [.font: font]).width)
+        let shortName = DownloadMonitorService.shortenDownloadDisplayName(fileName)
+        let nameWidth = ceil((shortName as NSString).size(withAttributes: [.font: font]).width)
 
-        // Left wing content width: icon (13pt) + spacing (6pt) + filename
-        let leftContentWidth = 13 + 6 + nameWidth
+        // Left wing content width: icon (13pt) + spacing (5.5pt) + speed/status (approx 44-52pt)
+        let leftContentWidth: CGFloat = 13 + 5.5 + 50 // ~68.5 pt
 
         // Right wing content width:
         let rightContentWidth: CGFloat
         if let st = statusText, (st == "Download Complete" || st == "Download Failed") {
             let stWidth = ceil((st as NSString).size(withAttributes: [.font: font]).width)
             rightContentWidth = stWidth
-        } else {
-            let frac = progress ?? 0.0
+        } else if let frac = progress {
             let txt = "\(Int(round(frac * 100)))%"
             let txtWidth = ceil((txt as NSString).size(withAttributes: [.font: font]).width)
-            // progress bar (48pt) + spacing (6pt) + percent text
-            rightContentWidth = 48 + 6 + txtWidth
+            // shortName + spacing (6.5pt) + circular ring (15pt) + spacing (5.5pt) + percent text
+            rightContentWidth = nameWidth + 6.5 + 15 + 5.5 + txtWidth
+        } else {
+            // shortName + spacing (6.5pt) + circular ring (15pt) + spacing (5.5pt) + size text
+            rightContentWidth = nameWidth + 6.5 + 15 + 5.5 + 46
         }
 
         // Symmetrical margin on both sides of content:
-        // Ensures content sits comfortably centered between outer edge and physical bezel.
-        let sideMargin: CGFloat = 18
-        let leftWingNeeded = leftContentWidth + (sideMargin * 2)
-        let rightWingNeeded = rightContentWidth + (sideMargin * 2)
+        let sideMargin: CGFloat = 12
+        let needed = max(leftContentWidth, rightContentWidth) + (sideMargin * 2)
 
-        // Symmetrical balance: both wings match the larger required width
-        let desiredWing = max(leftWingNeeded, rightWingNeeded)
-        // Clamp: min 120 pt, max 152 pt so wings never collide with right-side menu bar widgets (e.g. CPU stats)
-        return min(max(desiredWing, 120), 152)
+        // Balanced symmetrical width: min 112 pt, max 138 pt so both wings are clean, equal and never collide
+        return min(max(needed, 112), 138)
     }
 
     /// Dynamically computes the balanced wing width for battery transient HUD notifications (including Unplug Charger / Fully Charged),
@@ -339,7 +338,14 @@ public final class WindowManager: ObservableObject {
         let targetWidth = CGFloat(settings.expandedWidth) + 2 * CGFloat(settings.expandedTopCornerRadius)
         let newSize = CGSize(width: targetWidth, height: height)
         guard self.expandedSize != newSize else { return }
-        self.expandedSize = newSize
+        if isExpanded {
+            let resp = settings.animationSpeed.expandResponse
+            withAnimation(.spring(response: resp, dampingFraction: 0.82)) {
+                self.expandedSize = newSize
+            }
+        } else {
+            self.expandedSize = newSize
+        }
     }
 
     // MARK: - Zero-Lag GPU Morphing Expand & Collapse
@@ -790,11 +796,11 @@ public final class WindowManager: ObservableObject {
 
         let headerRow: CGFloat = 22
         let dividerBlock: CGFloat = 1 + 6 + 6
-        let pageBody: CGFloat = 116
+        let pageBody: CGFloat = max(100, 116 + CGFloat(settings.expandedHeightOffset))
         let bottomInset: CGFloat = 14
 
         let natural = topClearance + headerRow + dividerBlock + pageBody + bottomInset + mirrorExtra
-        let finalHeight = max(140, natural + CGFloat(settings.expandedHeightOffset))
+        let finalHeight = max(140, natural)
         setExpandedHeight(finalHeight)
     }
 

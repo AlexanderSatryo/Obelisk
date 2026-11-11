@@ -17,6 +17,10 @@ public struct FileTrayView: View {
 
     public init() {}
 
+    private var contentHeight: CGFloat {
+        max(90, 114 + CGFloat(settings.expandedHeightOffset))
+    }
+
     public var body: some View {
         HStack(spacing: 0) {
             shelfArea
@@ -24,13 +28,13 @@ public struct FileTrayView: View {
 
             Rectangle()
                 .fill(Color.white.opacity(0.12))
-                .frame(width: 1, height: 96)
+                .frame(width: 1, height: max(70, contentHeight - 18))
                 .padding(.horizontal, 10)
 
             airDropArea
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(height: 114)
+        .frame(height: contentHeight)
         .padding(.top, 2)
     }
 

@@ -184,6 +184,7 @@ public enum ExpandedWidthPreset: String, CaseIterable, Identifiable, Equatable {
     case compact = "compact"
     case standard = "standard"
     case wide = "wide"
+    case custom = "custom"
 
     public var id: String { rawValue }
 
@@ -192,6 +193,7 @@ public enum ExpandedWidthPreset: String, CaseIterable, Identifiable, Equatable {
         case .compact: return "Compact (560 pt)"
         case .standard: return "Standard (620 pt)"
         case .wide: return "Wide (680 pt)"
+        case .custom: return "Custom"
         }
     }
 
@@ -200,6 +202,7 @@ public enum ExpandedWidthPreset: String, CaseIterable, Identifiable, Equatable {
         case .compact: return 560
         case .standard: return 620
         case .wide: return 680
+        case .custom: return 620
         }
     }
 }
@@ -503,7 +506,7 @@ public struct ObeliskSettingsDraft: Equatable {
     public var enableNotifications: Bool = true
     public var notificationFilterCategory: NotificationFilterCategory = .all
     public var requireTouchIDForNotifications: Bool = true
-    public var notificationAutoDismissSeconds: Double = 10.0
+    public var notificationAutoDismissSeconds: Double = 2.5
     public var defaultOpeningTab: DefaultOpeningTab = .lastUsed
 
     public var fileTrayCapacity: Int = 10
@@ -1007,7 +1010,7 @@ public final class ObeliskSettings: ObservableObject {
         let savedFilter = defaults.string(forKey: "cfg_notificationFilterCategory") ?? ""
         self.notificationFilterCategory = NotificationFilterCategory(rawValue: savedFilter) ?? .all
         self.requireTouchIDForNotifications = defaults.object(forKey: "cfg_requireTouchIDForNotifications") as? Bool ?? true
-        self.notificationAutoDismissSeconds = defaults.object(forKey: "cfg_notificationAutoDismissSeconds") as? Double ?? 10.0
+        self.notificationAutoDismissSeconds = defaults.object(forKey: "cfg_notificationAutoDismissSeconds") as? Double ?? 2.5
         let savedDefaultTabRaw = defaults.string(forKey: "cfg_defaultOpeningTab") ?? ""
         if savedDefaultTabRaw == "alwaysSystem" {
             self.defaultOpeningTab = .alwaysFile

@@ -38,6 +38,10 @@ public struct NotchPageView: View {
         settings.showLyricsInNotch && !isVideoSource && mediaManager.currentTrack.source != .none
     }
 
+    private var contentHeight: CGFloat {
+        max(90, 114 + CGFloat(settings.expandedHeightOffset))
+    }
+
     /// Video, film, and non-lyrics mode show the player alone.
     /// When lyrics mode is active, the notch preserves the split columns consistently across track transitions.
     @ViewBuilder
@@ -49,18 +53,18 @@ public struct NotchPageView: View {
 
                 Rectangle()
                     .fill(Color.white.opacity(0.12))
-                    .frame(width: 1, height: 96)
+                    .frame(width: 1, height: max(70, contentHeight - 18))
                     .padding(.horizontal, 10)
 
                 LyricsSideView(lyricsService: lyricsService, mediaManager: mediaManager)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 114)
+            .frame(height: contentHeight)
             .padding(.top, 2)
         } else {
             MediaPlayerView(mediaManager: mediaManager)
                 .frame(maxWidth: .infinity)
-                .frame(height: 114)
+                .frame(height: contentHeight)
                 .padding(.top, 2)
         }
     }

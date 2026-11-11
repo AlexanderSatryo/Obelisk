@@ -136,17 +136,17 @@ public struct CompactNotchView: View {
     @ViewBuilder
     private func leftWingView(wingWidth: CGFloat) -> some View {
         if settings.showDownloadsOnStandby, let activeDownload = downloadService.activeDownloads.first {
-            HStack(spacing: 6) {
+            HStack(spacing: 5.5) {
                 Image(systemName: "arrow.down.circle")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
-                Text(activeDownload.displayName)
+                let speedText = activeDownload.speedFormatted.isEmpty ? "Downloading" : activeDownload.speedFormatted
+                Text(speedText)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
-                    .truncationMode(.middle)
             }
-            .frame(maxWidth: max(60, wingWidth - 20))
+            .frame(maxWidth: max(60, wingWidth - 10))
         } else {
             standardLeftWingContent
         }
@@ -240,24 +240,29 @@ public struct CompactNotchView: View {
     @ViewBuilder
     private var rightWingView: some View {
         if settings.showDownloadsOnStandby, let activeDownload = downloadService.activeDownloads.first {
-            let frac = activeDownload.progressFraction ?? 0.0
-            HStack(spacing: 6) {
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.22))
-                        .frame(width: 48, height: 4)
-                    Capsule()
-                        .fill(Color.white)
-                        .frame(width: max(4, min(48, 48 * CGFloat(frac))), height: 4)
-                        .animation(.easeOut(duration: 0.28), value: frac)
+            let rawName = activeDownload.displayName
+            let effectiveName: String = {
+                if rawName.isEmpty || rawName == "Downloading..." || rawName.lowercased().hasPrefix("unconfirmed") {
+                    if NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == "com.google.Chrome" }) {
+                        return "googlechrome.dmg"
+                    }
+                    return "Download.pkg"
                 }
-                .frame(width: 48, height: 4)
+                return rawName
+            }()
 
-                Text("\(Int(round(frac * 100)))%")
+            HStack(spacing: 6.5) {
+                // Shortened / abbreviated filename directly to the left of the circular progress indicator
+                Text(DownloadMonitorService.shortenDownloadDisplayName(effectiveName))
                     .font(.system(size: 11, weight: .semibold))
-                    .monospacedDigit()
                     .foregroundColor(.white)
                     .lineLimit(1)
+                    .truncationMode(.middle)
+
+                AppleCircularDownloadProgressView(
+                    progressFraction: activeDownload.progressFraction,
+                    currentBytes: activeDownload.currentBytes
+                )
             }
         } else {
             standardRightWingContent

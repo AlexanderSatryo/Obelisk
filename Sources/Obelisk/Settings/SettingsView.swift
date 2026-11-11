@@ -77,7 +77,7 @@ public enum SettingsCategory: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Structured search index item with multi-keyword mapping in English
+/// Structured search index item strictly matching English UI text (sections, rows, subtitles, and options)
 public struct SettingsSearchItem: Identifiable, Sendable {
     public let id: String
     public let title: String
@@ -85,66 +85,264 @@ public struct SettingsSearchItem: Identifiable, Sendable {
     public let keywords: [String]
 
     public func matches(query: String) -> Bool {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !q.isEmpty else { return false }
-        if title.lowercased().contains(q) { return true }
-        if category.rawValue.lowercased().contains(q) { return true }
-        return keywords.contains { $0.lowercased().contains(q) }
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return false }
+        let tokens = trimmed.split(separator: " ").map { String($0) }.filter { !$0.isEmpty }
+        guard !tokens.isEmpty else { return false }
+
+        // Fast direct substring match
+        if title.lowercased().contains(trimmed) || category.rawValue.lowercased().contains(trimmed) || keywords.contains(where: { $0.lowercased().contains(trimmed) }) {
+            return true
+        }
+
+        // Multi-word query: all tokens must match either title, category, or UI keywords
+        let corpus = ([title, category.rawValue] + keywords).joined(separator: " ").lowercased()
+        return tokens.allSatisfy { token in corpus.contains(token) }
     }
 }
 
-/// Comprehensive deep index of all settings options across Obelisk
+/// Comprehensive deep index of all settings options across Obelisk matching English UI names only
 public enum SettingsSearchIndex {
     public static let allItems: [SettingsSearchItem] = [
-        // Appearance
-        SettingsSearchItem(id: "surface", title: "Surface Material (Standby & Hover)", category: .appearance, keywords: ["surface", "material", "standby", "hover", "extend", "standby material", "expanded material", "liquid glass", "dark liquid glass", "dark glass", "frosted glass", "pitch black", "ambient glow", "apple glass", "oled"]),
-        SettingsSearchItem(id: "opacity", title: "Notch Opacity", category: .appearance, keywords: ["opacity", "transparency", "notch opacity", "surface opacity", "transparent", "alpha", "blur", "see through"]),
-        SettingsSearchItem(id: "border", title: "Hairline Rim Border", category: .appearance, keywords: ["border", "hairline rim", "stroke", "rim", "edge", "border width", "border opacity"]),
-        SettingsSearchItem(id: "theme", title: "Color Preset Theme", category: .appearance, keywords: ["color theme", "color preset", "theme", "color", "palette", "soft", "colorful", "monochrome", "brightness"]),
-        SettingsSearchItem(id: "geometry", title: "Geometry & Dimensions", category: .appearance, keywords: ["geometry", "compact width", "compact height", "expanded width", "radius", "width", "height", "dimensions", "offset", "size"]),
-        SettingsSearchItem(id: "topCornerRadius", title: "Top Bezel Corner Radius", category: .appearance, keywords: ["top radius", "top corner radius", "bezel", "ears", "compact top radius", "expanded top radius", "curvature"]),
-        SettingsSearchItem(id: "bottomCornerRadius", title: "Bottom Corner Radius", category: .appearance, keywords: ["bottom radius", "bottom corner radius", "compact radius", "expanded radius", "corner radius", "curvature"]),
-        SettingsSearchItem(id: "standbyHUD", title: "Standby HUD Layout", category: .appearance, keywords: ["hud", "standby hud", "hud layout", "hud style", "volume", "brightness", "charge", "charging", "fully charged", "battery charged", "unplug", "connected", "disconnected", "caps lock", "caps", "keyboard", "side expansion", "horizontal wings", "downward card", "extended card"]),
-        SettingsSearchItem(id: "compactWings", title: "Compact Wings Mode", category: .appearance, keywords: ["compact wings", "wing expansion", "always minimal", "dynamic auto", "always wide", "wings"]),
-        SettingsSearchItem(id: "leftWing", title: "Left Wing Content", category: .appearance, keywords: ["left wing", "weather mini", "battery status", "clock", "camera", "logo", "artwork", "battery", "cpu", "thumbnail"]),
-        SettingsSearchItem(id: "rightWing", title: "Right Wing Style", category: .appearance, keywords: ["right wing", "waveform", "visualizer", "audio wave", "equalizer bars", "battery", "telemetry", "timer", "minimal dots"]),
-        SettingsSearchItem(id: "waveformColor", title: "Waveform Color Mode", category: .appearance, keywords: ["waveform color", "waveform", "audio wave", "media accent", "monochrome white"]),
-        SettingsSearchItem(id: "timerColor", title: "Compact Timer Color", category: .appearance, keywords: ["timer color", "compact timer", "playback timer", "timer accent"]),
+        // 1. Appearance
+        SettingsSearchItem(
+            id: "surface",
+            title: "Surface Material",
+            category: .appearance,
+            keywords: ["surface & border", "surface", "material", "standby material", "expanded material", "liquid glass", "dark liquid glass", "dark glass", "frosted glass", "pitch black", "ambient glow", "apple glass", "oled"]
+        ),
+        SettingsSearchItem(
+            id: "opacity",
+            title: "Notch Opacity",
+            category: .appearance,
+            keywords: ["surface & border", "notch opacity", "opacity", "transparency", "surface opacity", "alpha"]
+        ),
+        SettingsSearchItem(
+            id: "border",
+            title: "Hairline Rim Border",
+            category: .appearance,
+            keywords: ["surface & border", "hairline rim border", "border width", "border opacity", "border", "edge stroke", "outline", "rim", "curvature"]
+        ),
+        SettingsSearchItem(
+            id: "theme",
+            title: "Color Theme & Brightness",
+            category: .appearance,
+            keywords: ["color theme & brightness", "color preset", "brightness", "color theme", "theme", "palette", "soft pastel", "colorful", "monochrome", "standard"]
+        ),
+        SettingsSearchItem(
+            id: "geometry",
+            title: "Geometry & Dimensions",
+            category: .appearance,
+            keywords: ["geometry", "compact width offset", "compact height offset", "expanded width preset", "expanded width", "expanded height offset", "dimensions", "width", "height", "offset", "preset", "compact", "standard", "wide", "custom"]
+        ),
+        SettingsSearchItem(
+            id: "topCornerRadius",
+            title: "Top Bezel Corner Radius",
+            category: .appearance,
+            keywords: ["geometry", "compact top radius (bezel)", "expanded top radius (bezel)", "top radius", "top corner radius", "bezel", "curvature"]
+        ),
+        SettingsSearchItem(
+            id: "bottomCornerRadius",
+            title: "Bottom Corner Radius",
+            category: .appearance,
+            keywords: ["geometry", "compact bottom radius", "expanded bottom radius", "bottom radius", "bottom corner radius", "corner radius", "curvature"]
+        ),
+        SettingsSearchItem(
+            id: "standbyHUD",
+            title: "Standby HUD & Notifications",
+            category: .appearance,
+            keywords: ["standby hud & notifications", "standby hud layout", "standby hud", "hud", "show caps lock hud", "caps lock", "battery fully charged alert", "battery", "side expansion (wings)", "horizontal wings", "downward card", "volume", "brightness"]
+        ),
+        SettingsSearchItem(
+            id: "compactWings",
+            title: "Compact Wings Mode",
+            category: .appearance,
+            keywords: ["compact wings", "wing expansion mode", "always minimal", "dynamic auto", "always wide", "wings"]
+        ),
+        SettingsSearchItem(
+            id: "leftWing",
+            title: "Left Wing Content",
+            category: .appearance,
+            keywords: ["compact wings", "left wing content", "left wing", "weather mini", "battery status", "clock", "camera", "logo", "album artwork", "thumbnail"]
+        ),
+        SettingsSearchItem(
+            id: "rightWing",
+            title: "Right Wing Style",
+            category: .appearance,
+            keywords: ["compact wings", "right wing style", "right wing", "waveform", "visualizer", "equalizer", "battery", "telemetry", "timer", "minimal dots"]
+        ),
+        SettingsSearchItem(
+            id: "waveformColor",
+            title: "Waveform Color",
+            category: .appearance,
+            keywords: ["compact wings", "waveform color", "waveform", "audio wave", "media accent", "monochrome white"]
+        ),
+        SettingsSearchItem(
+            id: "timerColor",
+            title: "Compact Timer Color",
+            category: .appearance,
+            keywords: ["compact wings", "compact timer color", "timer color", "timer", "playback timer", "timer accent"]
+        ),
 
-        // Behavior
-        SettingsSearchItem(id: "trigger", title: "Trigger Mode", category: .behavior, keywords: ["trigger mode", "hover", "click", "dwell latency", "grace period", "interaction"]),
-        SettingsSearchItem(id: "animation", title: "Animation Speed", category: .behavior, keywords: ["animation speed", "spring", "snappy", "balanced", "fluid", "animation curves", "transition"]),
-        SettingsSearchItem(id: "gestures", title: "Trackpad Gestures & Swipe", category: .behavior, keywords: ["gestures", "trackpad", "swipe", "two-finger page swipe"]),
+        // 2. Behavior
+        SettingsSearchItem(
+            id: "trigger",
+            title: "Interaction & Hover",
+            category: .behavior,
+            keywords: ["interaction & hover", "trigger mode", "hover dwell latency", "exit grace period", "hover", "click only", "dwell", "latency"]
+        ),
+        SettingsSearchItem(
+            id: "animation",
+            title: "Animation Speed",
+            category: .behavior,
+            keywords: ["animation", "speed preset", "animation speed", "snappy", "balanced", "fluid", "spring", "damping"]
+        ),
+        SettingsSearchItem(
+            id: "gestures",
+            title: "Trackpad Gestures",
+            category: .behavior,
+            keywords: ["trackpad gestures", "two-finger page swipe", "invert horizontal swipe", "gestures", "trackpad", "swipe"]
+        ),
 
-        // Modules
-        SettingsSearchItem(id: "mediaModule", title: "Media Player Module", category: .modules, keywords: ["media player", "music", "spotify", "apple music", "youtube", "playback"]),
-        SettingsSearchItem(id: "weatherModule", title: "Weather Module", category: .modules, keywords: ["weather", "forecast", "temperature", "rain", "precipitation", "conditions"]),
-        SettingsSearchItem(id: "calendarModule", title: "Calendar Module", category: .modules, keywords: ["calendar", "schedule", "agenda", "events", "date"]),
-        SettingsSearchItem(id: "fileModule", title: "File Tray & AirDrop Module", category: .modules, keywords: ["file", "airdrop", "tray", "shelf", "drop", "drag and drop", "file shelf", "share"]),
-        SettingsSearchItem(id: "defaultOpeningTab", title: "Opening Tab / Default View", category: .modules, keywords: ["opening tab", "default view", "remember last open", "default opening tab", "initial tab"]),
-        SettingsSearchItem(id: "fileTrayCapacity", title: "File Shelf Capacity", category: .modules, keywords: ["shelf capacity", "file shelf capacity", "tray capacity", "file limit"]),
-        SettingsSearchItem(id: "autoClearAfterAirDrop", title: "Auto-Clear After AirDrop", category: .modules, keywords: ["auto-clear", "clear after airdrop", "automatic clear", "empty shelf"]),
-        SettingsSearchItem(id: "calendarEventDots", title: "Calendar Event Indicators", category: .modules, keywords: ["calendar event", "event dots", "event indicators", "agenda markers", "event badge"]),
-        SettingsSearchItem(id: "downloads", title: "Live Downloads & Task Progress", category: .modules, keywords: ["download", "downloads", "progress", "live activities", "download progress", "crdownload", "task progress"]),
-        SettingsSearchItem(id: "notifications", title: "Dynamic Island Notifications & Touch ID", category: .modules, keywords: ["notification", "notifications", "touch id", "face id", "biometrics", "privacy", "whatsapp", "mail", "telegram", "messages", "dynamic island notifications", "lock", "filter", "category", "entertainment", "social media", "productivity"]),
+        // 3. Modules
+        SettingsSearchItem(
+            id: "mediaModule",
+            title: "Media Player",
+            category: .modules,
+            keywords: ["dashboard pages", "media player", "music", "playback controls", "artwork", "scrubber", "now playing"]
+        ),
+        SettingsSearchItem(
+            id: "weatherModule",
+            title: "Weather Forecast",
+            category: .modules,
+            keywords: ["dashboard pages", "weather", "forecast", "current conditions", "temperature", "hourly forecast"]
+        ),
+        SettingsSearchItem(
+            id: "calendarModule",
+            title: "Calendar Agenda",
+            category: .modules,
+            keywords: ["dashboard pages", "calendar", "agenda", "events", "upcoming events", "schedule"]
+        ),
+        SettingsSearchItem(
+            id: "fileModule",
+            title: "File & AirDrop Shelf",
+            category: .modules,
+            keywords: ["dashboard pages", "file & airdrop shelf", "file", "airdrop", "shelf", "drag and drop", "tray"]
+        ),
+        SettingsSearchItem(
+            id: "defaultOpeningTab",
+            title: "Default View",
+            category: .modules,
+            keywords: ["default view", "opening tab", "initial notch tab", "remember last used"]
+        ),
+        SettingsSearchItem(
+            id: "fileTrayCapacity",
+            title: "Shelf Capacity",
+            category: .modules,
+            keywords: ["file & airdrop shelf", "shelf capacity", "maximum files in shelf", "file limit"]
+        ),
+        SettingsSearchItem(
+            id: "autoClearAfterAirDrop",
+            title: "Auto-Clear After AirDrop",
+            category: .modules,
+            keywords: ["file & airdrop shelf", "auto-clear after airdrop", "clear staged files", "empty shelf"]
+        ),
+        SettingsSearchItem(
+            id: "calendarEventDots",
+            title: "Calendar Event Indicators",
+            category: .modules,
+            keywords: ["calendar strip", "show event indicators", "event indicators", "event dots", "markers"]
+        ),
+        SettingsSearchItem(
+            id: "downloads",
+            title: "Downloads & Tasks",
+            category: .modules,
+            keywords: ["downloads & tasks", "live download & task progress", "live downloads", "download", "task progress", "percentage", "crdownload"]
+        ),
+        SettingsSearchItem(
+            id: "notifications",
+            title: "Dynamic Island Notifications",
+            category: .modules,
+            keywords: ["dynamic island notifications", "incoming notification popups (standby hud)", "notification category", "auto-dismiss timeout", "notification history page", "notification", "notifications", "alerts", "touch id"]
+        ),
 
-        // Media & Lyrics
-        SettingsSearchItem(id: "lyrics", title: "Synchronized Lyrics", category: .media, keywords: ["synchronized lyrics", "lyrics", "live lyrics", "synced lyrics", "auto-expand lyrics"]),
-        SettingsSearchItem(id: "lyricsScale", title: "Lyrics Typography Scale", category: .media, keywords: ["typography scale", "lyrics font scale", "lyrics typography", "font size", "text scale"]),
-        SettingsSearchItem(id: "lyricsOffset", title: "Lyrics Timing Offset", category: .media, keywords: ["lyrics timing offset", "lyrics offset", "lyrics delay", "lyrics sync", "timing offset"]),
-        SettingsSearchItem(id: "seekInterval", title: "Video Seek Interval", category: .media, keywords: ["seek interval", "video seek", "skip interval", "rewind", "fast-forward", "scrub interval"]),
+        // 4. Media & Lyrics
+        SettingsSearchItem(
+            id: "lyrics",
+            title: "Synchronized Lyrics",
+            category: .media,
+            keywords: ["lyrics", "show synchronized lyrics", "auto-expand on track change", "live lyrics", "karaoke"]
+        ),
+        SettingsSearchItem(
+            id: "lyricsScale",
+            title: "Typography Scale",
+            category: .media,
+            keywords: ["lyrics", "typography scale", "lyrics font scale", "text size", "font size"]
+        ),
+        SettingsSearchItem(
+            id: "lyricsOffset",
+            title: "Lyrics Timing Offset",
+            category: .media,
+            keywords: ["lyrics", "lyrics timing offset", "timing offset", "delay", "sync lead"]
+        ),
+        SettingsSearchItem(
+            id: "seekInterval",
+            title: "Video Seek Interval",
+            category: .media,
+            keywords: ["navigation", "video seek interval", "seek step duration", "rewind", "fast-forward", "scrub"]
+        ),
 
-        // Weather
-        SettingsSearchItem(id: "temperatureUnit", title: "Temperature Unit", category: .weather, keywords: ["temperature unit", "celsius", "fahrenheit", "temperature scale", "degrees"]),
-        SettingsSearchItem(id: "windUnit", title: "Wind Velocity Unit", category: .weather, keywords: ["wind velocity", "wind speed", "km/h", "mph", "m/s"]),
-        SettingsSearchItem(id: "weatherLocation", title: "Location Mode", category: .weather, keywords: ["location mode", "gps", "geolocation", "city name", "geocoded", "manual location"]),
-        SettingsSearchItem(id: "weatherRefresh", title: "Weather Refresh Interval", category: .weather, keywords: ["refresh interval", "polling interval", "weather update frequency", "refresh rate"]),
+        // 5. Weather
+        SettingsSearchItem(
+            id: "temperatureUnit",
+            title: "Temperature Unit",
+            category: .weather,
+            keywords: ["units", "temperature", "celsius", "fahrenheit", "degrees"]
+        ),
+        SettingsSearchItem(
+            id: "windUnit",
+            title: "Wind Velocity Unit",
+            category: .weather,
+            keywords: ["units", "wind velocity", "wind speed", "km/h", "mph", "m/s"]
+        ),
+        SettingsSearchItem(
+            id: "weatherLocation",
+            title: "Location Mode & City",
+            category: .weather,
+            keywords: ["location & refresh", "location mode", "city name", "gps (automatic)", "manual city"]
+        ),
+        SettingsSearchItem(
+            id: "weatherRefresh",
+            title: "Weather Refresh Interval",
+            category: .weather,
+            keywords: ["location & refresh", "refresh interval", "polling frequency", "update rate"]
+        ),
 
-        // System
-        SettingsSearchItem(id: "login", title: "Launch at Login", category: .system, keywords: ["launch at login", "startup", "autostart", "login items"]),
-        SettingsSearchItem(id: "menuBar", title: "Show Menu Bar Icon", category: .system, keywords: ["menu bar icon", "status bar", "status bar icon", "menu bar"]),
-        SettingsSearchItem(id: "resetAll", title: "Reset All Preferences", category: .system, keywords: ["reset all", "reset defaults", "restore factory defaults", "reset preferences"]),
-        SettingsSearchItem(id: "quit", title: "Quit Obelisk", category: .system, keywords: ["quit", "exit", "terminate", "close application"])
+        // 6. System
+        SettingsSearchItem(
+            id: "login",
+            title: "Launch at Login",
+            category: .system,
+            keywords: ["integration", "launch at login", "start at login", "startup", "login items"]
+        ),
+        SettingsSearchItem(
+            id: "menuBar",
+            title: "Show Menu Bar Icon",
+            category: .system,
+            keywords: ["integration", "show menu bar icon", "status bar icon", "status item", "menu bar"]
+        ),
+        SettingsSearchItem(
+            id: "resetAll",
+            title: "Reset All Preferences",
+            category: .system,
+            keywords: ["management", "reset all preferences", "reset defaults", "restore factory defaults", "reset"]
+        ),
+        SettingsSearchItem(
+            id: "quit",
+            title: "Quit Obelisk",
+            category: .system,
+            keywords: ["management", "quit obelisk", "quit", "exit", "terminate", "close"]
+        )
     ]
 }
 
@@ -160,6 +358,7 @@ public struct SettingsView: View {
     @State private var draft: ObeliskSettingsDraft = ObeliskSettings.shared.makeDraft()
     @State private var savedSnapshot: ObeliskSettingsDraft = ObeliskSettings.shared.makeDraft()
     @State private var selectedCategory: SettingsCategory = .appearance
+    @State private var selectedCategoryFilter: SettingsCategory? = nil
     @State private var searchText: String = ""
     @FocusState private var isSearchFocused: Bool
     @State private var previewExpandedState: Bool = false
@@ -168,6 +367,17 @@ public struct SettingsView: View {
     @State private var isPreviewFrozen: Bool = false
     @State private var frozenDraft: ObeliskSettingsDraft? = nil
     @State private var hasUnsavedChanges: Bool = false
+    @State private var showingResetConfirmation: Bool = false
+
+    private var availableDefaultOpeningTabOptions: [(value: DefaultOpeningTab, title: String)] {
+        var options: [(value: DefaultOpeningTab, title: String)] = [(.lastUsed, DefaultOpeningTab.lastUsed.title)]
+        if draft.enableMediaTab { options.append((.alwaysMedia, DefaultOpeningTab.alwaysMedia.title)) }
+        if draft.enableWeatherTab { options.append((.alwaysWeather, DefaultOpeningTab.alwaysWeather.title)) }
+        if draft.enableCalendarTab { options.append((.alwaysCalendar, DefaultOpeningTab.alwaysCalendar.title)) }
+        if draft.enableFileTab { options.append((.alwaysFile, DefaultOpeningTab.alwaysFile.title)) }
+        if draft.enableNotificationTab { options.append((.alwaysNotification, DefaultOpeningTab.alwaysNotification.title)) }
+        return options
+    }
 
     private func matchesCurrentQuery(_ searchItemId: String) -> Bool {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -219,14 +429,18 @@ public struct SettingsView: View {
 
             // MARK: - Right Detail Content Area
             VStack(spacing: 0) {
-                // macOS Category Header
-                detailHeaderView
+                // macOS Category or Search Header
+                if searchText.isEmpty {
+                    detailHeaderView
+                } else {
+                    searchHeaderView
+                }
 
                 Rectangle()
                     .fill(Color.white.opacity(0.06))
                     .frame(height: 1)
 
-                // Pinned Live Preview (when in Appearance)
+                // Pinned Live Preview (when in Appearance and not searching)
                 if selectedCategory == .appearance && searchText.isEmpty {
                     previewCanvas
                         .padding(.horizontal, 24)
@@ -242,11 +456,11 @@ public struct SettingsView: View {
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(alignment: .leading, spacing: 20) {
                         if !searchText.isEmpty {
-                            searchBannerView
-                        }
-
-                        if !searchText.isEmpty && matchingItemCount(for: selectedCategory) == 0 {
-                            noResultsForCategoryView
+                            if totalMatchingItems == 0 {
+                                noResultsAcrossAllSettingsView
+                            } else {
+                                allSearchResultsView
+                            }
                         } else {
                             switch selectedCategory {
                             case .appearance:
@@ -282,24 +496,31 @@ public struct SettingsView: View {
         .frame(width: 840, height: 620)
         .background(Color(red: 16/255, green: 16/255, blue: 18/255))
         .preferredColorScheme(.dark)
+        .confirmationDialog(
+            "Reset All Preferences?",
+            isPresented: $showingResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Reset All to Default", role: .destructive) {
+                draft = ObeliskSettingsDraft()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will restore all appearance, behavior, modules, and media preferences to their initial factory settings.")
+        }
         .onAppear {
             let initial = settings.makeDraft()
             draft = initial
             savedSnapshot = initial
             hasUnsavedChanges = false
             isSearchFocused = false
+            selectedCategoryFilter = nil
         }
         .onChange(of: draft) { newDraft in
             hasUnsavedChanges = (newDraft != savedSnapshot)
         }
-        .onChange(of: searchText) { newQuery in
-            let q = newQuery.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            guard !q.isEmpty else { return }
-            if !filteredCategories.contains(selectedCategory), let first = filteredCategories.first {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                    selectedCategory = first
-                }
-            }
+        .onChange(of: searchText) { _ in
+            selectedCategoryFilter = nil
         }
     }
 
@@ -338,6 +559,7 @@ public struct SettingsView: View {
                 if !searchText.isEmpty {
                     Button(action: {
                         searchText = ""
+                        selectedCategoryFilter = nil
                         isSearchFocused = false
                     }) {
                         Image(systemName: "xmark.circle.fill")
@@ -363,61 +585,96 @@ public struct SettingsView: View {
             // Navigation List
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 3) {
-                    ForEach(filteredCategories) { category in
-                        let isSelected = (selectedCategory == category)
+                    if searchText.isEmpty {
+                        ForEach(SettingsCategory.allCases) { category in
+                            categorySidebarItem(
+                                category: category,
+                                isSelected: selectedCategory == category,
+                                matchCount: nil
+                            ) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                                    selectedCategory = category
+                                }
+                            }
+                        }
+                    } else {
+                        // "All Results" master row
+                        let isAllSelected = (selectedCategoryFilter == nil)
                         Button(action: {
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                                selectedCategory = category
+                                selectedCategoryFilter = nil
                             }
                         }) {
                             HStack(spacing: 10) {
-                                // Rounded square soft badge
                                 ZStack {
                                     RoundedRectangle(cornerRadius: 6.5, style: .continuous)
-                                        .fill(category.badgeGradient)
+                                        .fill(LinearGradient(colors: [Color.blue, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
                                         .frame(width: 26, height: 26)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 6.5, style: .continuous)
                                                 .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
                                         )
 
-                                    Image(systemName: category.icon)
-                                        .font(.system(size: 11.5, weight: .semibold))
+                                    Image(systemName: "list.bullet.indent")
+                                        .font(.system(size: 11, weight: .semibold))
                                         .foregroundColor(.white)
                                 }
 
-                                Text(category.rawValue)
-                                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                                    .foregroundColor(isSelected ? .white : .white.opacity(0.75))
+                                Text("All Results")
+                                    .font(.system(size: 13, weight: isAllSelected ? .semibold : .medium))
+                                    .foregroundColor(isAllSelected ? .white : .white.opacity(0.80))
 
                                 Spacer()
 
-                                let matchCount = matchingItemCount(for: category)
-                                if matchCount > 0 {
-                                    Text("\(matchCount)")
-                                        .font(.system(size: 9.5, weight: .bold))
-                                        .foregroundColor(Color.blue)
-                                        .padding(.horizontal, 5)
-                                        .padding(.vertical, 1.5)
-                                        .background(
-                                            Capsule()
-                                                .fill(Color.blue.opacity(0.18))
-                                        )
-                                }
+                                Text("\(totalMatchingItems)")
+                                    .font(.system(size: 9.5, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        Capsule()
+                                            .fill(isAllSelected ? Color.blue : Color.white.opacity(0.15))
+                                    )
 
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 10, weight: .semibold))
-                                    .foregroundColor(isSelected ? .white.opacity(0.50) : .white.opacity(0.18))
+                                    .foregroundColor(isAllSelected ? .white.opacity(0.50) : .white.opacity(0.18))
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .background(
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(isSelected ? Color.white.opacity(0.13) : Color.clear)
+                                    .fill(isAllSelected ? Color.white.opacity(0.13) : Color.clear)
                             )
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+
+                        Rectangle()
+                            .fill(Color.white.opacity(0.06))
+                            .frame(height: 1)
+                            .padding(.vertical, 4)
+
+                        let matchingCats = SettingsCategory.allCases.filter { matchingItemCount(for: $0) > 0 }
+                        if matchingCats.isEmpty {
+                            Text("No matching categories")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.35))
+                                .padding(.top, 12)
+                        } else {
+                            ForEach(matchingCats) { category in
+                                let isSelected = (selectedCategoryFilter == category)
+                                categorySidebarItem(
+                                    category: category,
+                                    isSelected: isSelected,
+                                    matchCount: matchingItemCount(for: category)
+                                ) {
+                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                                        selectedCategoryFilter = category
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal, 8)
@@ -425,6 +682,63 @@ public struct SettingsView: View {
 
             Spacer()
         }
+    }
+
+    @ViewBuilder
+    private func categorySidebarItem(
+        category: SettingsCategory,
+        isSelected: Bool,
+        matchCount: Int? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                // Rounded square soft badge
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6.5, style: .continuous)
+                        .fill(category.badgeGradient)
+                        .frame(width: 26, height: 26)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6.5, style: .continuous)
+                                .stroke(Color.white.opacity(0.18), lineWidth: 0.5)
+                        )
+
+                    Image(systemName: category.icon)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+
+                Text(category.rawValue)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                    .foregroundColor(isSelected ? .white : .white.opacity(0.75))
+
+                Spacer()
+
+                if let count = matchCount, count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(Color.blue)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1.5)
+                        .background(
+                            Capsule()
+                                .fill(Color.blue.opacity(0.18))
+                        )
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(isSelected ? .white.opacity(0.50) : .white.opacity(0.18))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isSelected ? Color.white.opacity(0.13) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Detail Header
@@ -532,96 +846,186 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - Search Banners & Fallbacks
+    // MARK: - Search Views & Results Across All Settings
 
-    private var searchBannerView: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(Color.blue)
+    private var searchHeaderView: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Color.blue)
 
-            let total = totalMatchingItems
-            Text("Search: \"\(searchText)\" • \(total) setting\(total == 1 ? "" : "s") found across Obelisk")
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundColor(.white.opacity(0.85))
+                    Text(selectedCategoryFilter != nil ? "\(selectedCategoryFilter!.rawValue) Results" : "Search Results")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                let currentMatches = selectedCategoryFilter != nil ? matchingItemCount(for: selectedCategoryFilter!) : totalMatchingItems
+                Text("\(currentMatches) setting\(currentMatches == 1 ? "" : "s") matching \"\(searchText)\"\(selectedCategoryFilter != nil ? " in \(selectedCategoryFilter!.rawValue)" : " across all categories")")
+                    .font(.system(size: 11.5))
+                    .foregroundColor(.white.opacity(0.55))
+                    .lineLimit(1)
+            }
 
             Spacer()
 
+            if selectedCategoryFilter != nil {
+                Button(action: {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                        selectedCategoryFilter = nil
+                    }
+                }) {
+                    Text("Show All Categories")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color.blue)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Color.blue.opacity(0.12))
+                        )
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+            }
+
             Button(action: {
                 searchText = ""
+                selectedCategoryFilter = nil
                 isSearchFocused = false
             }) {
-                Text("Clear")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Color.blue)
+                HStack(spacing: 5) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                    Text("Clear Search")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundColor(.white.opacity(0.80))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
+                )
             }
             .buttonStyle(.plain)
             .pointingHandCursor()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.blue.opacity(0.12))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.blue.opacity(0.25), lineWidth: 0.5)
-        )
+        .padding(.horizontal, 24)
+        .padding(.top, 24)
+        .padding(.bottom, 14)
     }
 
-    private var noResultsForCategoryView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 26, weight: .light))
-                .foregroundColor(.white.opacity(0.35))
-                .padding(.top, 14)
+    private var noResultsAcrossAllSettingsView: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.04))
+                    .frame(width: 56, height: 56)
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 24, weight: .light))
+                    .foregroundColor(.white.opacity(0.35))
+            }
+            .padding(.top, 40)
 
-            Text("No settings in \(selectedCategory.rawValue) match \"\(searchText)\"")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.70))
+            Text("No Settings Found")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
 
-            let otherMatches = filteredCategories.filter { $0 != selectedCategory && matchingItemCount(for: $0) > 0 }
-            if !otherMatches.isEmpty {
-                Text("Matching settings found in other sections:")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.45))
-                    .padding(.top, 4)
+            Text("No settings match \"\(searchText)\". Try searching for keywords like download, notch, speed, battery, weather, or notifications.")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.50))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 380)
 
-                HStack(spacing: 8) {
-                    ForEach(otherMatches) { cat in
-                        Button(action: {
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                                selectedCategory = cat
-                            }
-                        }) {
-                            HStack(spacing: 5) {
-                                Image(systemName: cat.icon)
-                                    .font(.system(size: 10))
-                                Text(cat.rawValue)
-                                    .font(.system(size: 11, weight: .medium))
-                                Text("\(matchingItemCount(for: cat))")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 1)
-                                    .background(Capsule().fill(Color.blue.opacity(0.25)))
-                            }
-                            .foregroundColor(Color.blue)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Color.blue.opacity(0.10))
-                            )
+            Button(action: {
+                searchText = ""
+                selectedCategoryFilter = nil
+                isSearchFocused = false
+            }) {
+                Text("Clear Search")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(Color.blue)
+                    )
+            }
+            .buttonStyle(.plain)
+            .pointingHandCursor()
+            .padding(.top, 8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+
+    private var allSearchResultsView: some View {
+        let displayCategories: [SettingsCategory] = {
+            if let filter = selectedCategoryFilter {
+                return matchingItemCount(for: filter) > 0 ? [filter] : []
+            }
+            return SettingsCategory.allCases.filter { matchingItemCount(for: $0) > 0 }
+        }()
+
+        return VStack(alignment: .leading, spacing: 26) {
+            ForEach(displayCategories) { category in
+                VStack(alignment: .leading, spacing: 14) {
+                    // Category Header Banner
+                    HStack(spacing: 8) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(category.badgeGradient)
+                                .frame(width: 22, height: 22)
+                            Image(systemName: category.icon)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.white)
                         }
-                        .buttonStyle(.plain)
-                        .pointingHandCursor()
+
+                        Text(category.rawValue.uppercased())
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundColor(.white.opacity(0.90))
+                            .tracking(0.6)
+
+                        Spacer()
+
+                        let count = matchingItemCount(for: category)
+                        Text("\(count) match\(count == 1 ? "" : "es")")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(Color.blue)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2.5)
+                            .background(Capsule().fill(Color.blue.opacity(0.15)))
+                    }
+                    .padding(.horizontal, 2)
+
+                    // Render Category Tab Sections
+                    switch category {
+                    case .appearance:
+                        appearanceTab
+                    case .behavior:
+                        behaviorTab
+                    case .modules:
+                        modulesTab
+                    case .media:
+                        mediaTab
+                    case .weather:
+                        weatherTab
+                    case .system:
+                        systemTab
+                    }
+
+                    if category != displayCategories.last {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.06))
+                            .frame(height: 1)
+                            .padding(.top, 12)
                     }
                 }
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
     }
 
     // MARK: - 1. Appearance Tab
@@ -680,6 +1084,7 @@ public struct SettingsView: View {
 
                         PreferenceSliderRow(
                             title: "Border Opacity",
+                            subtitle: "Adjusts outline stroke opacity around notch edge (useful if faint on external monitors)",
                             isHighlighted: matchesCurrentQuery("border"),
                             value: $draft.borderOpacity,
                             range: 0.04...0.40
@@ -741,10 +1146,25 @@ public struct SettingsView: View {
                     ) {
                         ModernMenuPicker(
                             selection: Binding(
-                                get: { draft.expandedWidthPreset },
+                                get: {
+                                    if draft.expandedWidthPreset == .custom {
+                                        return .custom
+                                    }
+                                    if abs(draft.expandedWidth - ExpandedWidthPreset.compact.width) < 1.0 {
+                                        return .compact
+                                    } else if abs(draft.expandedWidth - ExpandedWidthPreset.standard.width) < 1.0 {
+                                        return .standard
+                                    } else if abs(draft.expandedWidth - ExpandedWidthPreset.wide.width) < 1.0 {
+                                        return .wide
+                                    } else {
+                                        return .custom
+                                    }
+                                },
                                 set: { newPreset in
                                     draft.expandedWidthPreset = newPreset
-                                    draft.expandedWidth = Double(newPreset.width)
+                                    if newPreset != .custom {
+                                        draft.expandedWidth = Double(newPreset.width)
+                                    }
                                 }
                             ),
                             options: ExpandedWidthPreset.allCases.map { ($0, $0.title) }
@@ -753,13 +1173,29 @@ public struct SettingsView: View {
 
                     PreferenceSliderRow(
                         title: "Expanded Width",
+                        subtitle: "Custom width in points for expanded dashboard (560 - 760 pt)",
                         isHighlighted: matchesCurrentQuery("geometry"),
-                        value: $draft.expandedWidth,
+                        value: Binding(
+                            get: { draft.expandedWidth },
+                            set: { newVal in
+                                draft.expandedWidth = newVal
+                                if abs(newVal - ExpandedWidthPreset.compact.width) < 1.0 {
+                                    draft.expandedWidthPreset = .compact
+                                } else if abs(newVal - ExpandedWidthPreset.standard.width) < 1.0 {
+                                    draft.expandedWidthPreset = .standard
+                                } else if abs(newVal - ExpandedWidthPreset.wide.width) < 1.0 {
+                                    draft.expandedWidthPreset = .wide
+                                } else {
+                                    draft.expandedWidthPreset = .custom
+                                }
+                            }
+                        ),
                         range: 560...760
                     )
 
                     PreferenceSliderRow(
                         title: "Expanded Height Offset",
+                        subtitle: "Fine-tune vertical height of expanded cards and dashboard pages (-24 to +100 pt)",
                         isHighlighted: matchesCurrentQuery("geometry"),
                         value: $draft.expandedHeightOffset,
                         range: -24...100
@@ -915,6 +1351,7 @@ public struct SettingsView: View {
 
                     PreferenceSliderRow(
                         title: "Hover Dwell Latency",
+                        subtitle: "Delay before hover triggers expansion (lower = faster response)",
                         mode: .milliseconds,
                         isHighlighted: matchesCurrentQuery("trigger"),
                         value: $draft.hoverDwellMs,
@@ -924,6 +1361,7 @@ public struct SettingsView: View {
 
                     PreferenceSliderRow(
                         title: "Exit Grace Period",
+                        subtitle: "Grace time notch stays open after cursor leaves (higher = prevents accidental collapse)",
                         mode: .milliseconds,
                         isHighlighted: matchesCurrentQuery("trigger"),
                         value: $draft.exitGraceMs,
@@ -966,7 +1404,7 @@ public struct SettingsView: View {
                     if draft.enableHorizontalSwipe {
                         PreferenceToggleRow(
                             title: "Invert Horizontal Swipe",
-                            subtitle: "Reverse swipe navigation direction",
+                            subtitle: "Reverse swipe navigation direction if trackpad natural scrolling feels inverted",
                             isHighlighted: matchesCurrentQuery("gestures"),
                             isOn: $draft.invertHorizontalSwipe
                         )
@@ -1014,8 +1452,8 @@ public struct SettingsView: View {
                     )
 
                     PreferenceToggleRow(
-                        title: "Notifications",
-                        subtitle: "Recent notifications history and alert center",
+                        title: "Notification History Page (Expanded Notch)",
+                        subtitle: "Dedicated dashboard tab to browse and search recent notifications",
                         isHighlighted: matchesCurrentQuery("notifications") || matchesCurrentQuery("modules"),
                         isOn: $draft.enableNotificationTab
                     )
@@ -1042,8 +1480,8 @@ public struct SettingsView: View {
                     isHighlighted: matchesCurrentQuery("notifications")
                 ) {
                     PreferenceToggleRow(
-                        title: "Notifications HUD",
-                        subtitle: "Enable or disable incoming alert popups in the Dynamic Island notch",
+                        title: "Incoming Notification Popups (Standby HUD)",
+                        subtitle: "Pop up incoming alerts (WhatsApp, Telegram, Slack, etc.) while notch is collapsed",
                         isHighlighted: matchesCurrentQuery("notifications"),
                         isOn: $draft.enableNotifications
                     )
@@ -1065,7 +1503,7 @@ public struct SettingsView: View {
                             title: "Auto-Dismiss Timeout",
                             isHighlighted: matchesCurrentQuery("notifications"),
                             value: $draft.notificationAutoDismissSeconds,
-                            range: 5...30
+                            range: 1.5...15
                         )
                     }
                 }
@@ -1082,8 +1520,18 @@ public struct SettingsView: View {
                         isHighlighted: matchesCurrentQuery("defaultOpeningTab")
                     ) {
                         ModernMenuPicker(
-                            selection: $draft.defaultOpeningTab,
-                            options: DefaultOpeningTab.allCases.map { ($0, $0.title) },
+                            selection: Binding<DefaultOpeningTab>(
+                                get: {
+                                    if availableDefaultOpeningTabOptions.contains(where: { $0.value == draft.defaultOpeningTab }) {
+                                        return draft.defaultOpeningTab
+                                    }
+                                    return .lastUsed
+                                },
+                                set: { newVal in
+                                    draft.defaultOpeningTab = newVal
+                                }
+                            ),
+                            options: availableDefaultOpeningTabOptions,
                             width: 190
                         )
                     }
@@ -1194,7 +1642,7 @@ public struct SettingsView: View {
                 ) {
                     PreferenceRow(
                         title: "Video Seek Interval",
-                        subtitle: "Seconds skipped on rewind or fast-forward",
+                        subtitle: "Seconds skipped on rewind or fast-forward for browser video (YouTube & Vidio). Music tracks use next/prev.",
                         isHighlighted: matchesCurrentQuery("seekInterval")
                     ) {
                         ModernMenuPicker(
@@ -1264,7 +1712,7 @@ public struct SettingsView: View {
                     if draft.weatherLocationMode == .manualCity {
                         PreferenceRow(
                             title: "City Name",
-                            subtitle: "Geocoded for local forecast",
+                            subtitle: "Geocoded for local forecast (e.g. Jakarta, Tokyo, London)",
                             isHighlighted: matchesCurrentQuery("weatherLocation")
                         ) {
                             TextField("City", text: $draft.manualCityName)
@@ -1351,7 +1799,7 @@ public struct SettingsView: View {
                         icon: "arrow.counterclockwise.circle",
                         isDestructive: true
                     ) {
-                        draft = ObeliskSettingsDraft()
+                        showingResetConfirmation = true
                     }
                 }
                 .padding(.horizontal, 16)
@@ -2276,6 +2724,7 @@ struct SmoothCircularSlider: View {
 /// Standard preference row with a smooth circular slider and clean monospace value readout.
 struct PreferenceSliderRow: View {
     let title: String
+    var subtitle: String? = nil
     var mode: SliderDisplayMode = .normalized0To100
     var isHighlighted: Bool = false
     @Binding var value: Double
@@ -2318,18 +2767,26 @@ struct PreferenceSliderRow: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .center) {
-                    HStack(spacing: 6) {
-                        Text(title)
-                            .font(.system(size: 13, weight: .regular))
-                            .foregroundColor(.white)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(title)
+                                .font(.system(size: 13, weight: .regular))
+                                .foregroundColor(.white)
 
-                        if isHighlighted {
-                            Text("MATCH")
-                                .font(.system(size: 8.5, weight: .bold))
-                                .foregroundColor(Color.blue)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1.5)
-                                .background(Capsule().fill(Color.blue.opacity(0.18)))
+                            if isHighlighted {
+                                Text("MATCH")
+                                    .font(.system(size: 8.5, weight: .bold))
+                                    .foregroundColor(Color.blue)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1.5)
+                                    .background(Capsule().fill(Color.blue.opacity(0.18)))
+                            }
+                        }
+
+                        if let subtitle = subtitle {
+                            Text(subtitle)
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.45))
                         }
                     }
 

@@ -553,24 +553,11 @@ public struct NotchTransientHUDBar: View {
             }
 
         case .download(_, let statusText, let isSuccess, let progress):
-            if let frac = progress, statusText != "Download Complete" && statusText != "Download Failed" {
-                HStack(spacing: 6) {
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.20))
-                        Capsule()
-                            .fill(Color.white)
-                            .frame(width: max(4, min(48, 48 * CGFloat(frac))))
-                            .animation(.linear(duration: 0.3), value: frac)
-                    }
-                    .frame(width: 48, height: 4)
-
-                    Text("\(Int(round(frac * 100)))%")
-                        .font(.system(size: 11, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                }
+            if statusText != "Download Complete" && statusText != "Download Failed" {
+                AppleCircularDownloadProgressView(
+                    progressFraction: progress,
+                    currentBytes: 0
+                )
             } else if statusText == "Download Complete" || statusText == "Download Failed" {
                 Text(statusText)
                     .font(.system(size: 11, weight: .semibold))

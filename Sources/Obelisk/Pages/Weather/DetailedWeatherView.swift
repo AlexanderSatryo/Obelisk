@@ -38,7 +38,7 @@ public struct DetailedWeatherView: View {
             details(w)
                 .frame(width: 128, alignment: .leading)
         }
-        .frame(height: 114)
+        .frame(height: contentHeight)
         .padding(.top, 2)
         .brightness((settings.colorBrightness - 1.0) * 0.40)
         .onAppear {
@@ -46,10 +46,14 @@ public struct DetailedWeatherView: View {
         }
     }
 
+    private var contentHeight: CGFloat {
+        max(90, 114 + CGFloat(settings.expandedHeightOffset))
+    }
+
     private var hairline: some View {
         Rectangle()
             .fill(Color.white.opacity(0.12))
-            .frame(width: 1, height: 96)
+            .frame(width: 1, height: max(70, contentHeight - 18))
             .padding(.horizontal, 10)
     }
 

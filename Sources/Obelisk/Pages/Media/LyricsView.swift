@@ -44,9 +44,10 @@ public struct LyricsSideView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else if lyricsService.hasLyrics && !lyricsService.lines.isEmpty {
                 // Active Synced Lyrics Display (3-line karaoke scroll)
+                let scrollHeight: CGFloat = max(80, 96 + CGFloat(settings.expandedHeightOffset))
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: max(4, 6 * fontScale)) {
                             // Top padding so the first line can center nicely
                             Spacer(minLength: 16)
 
@@ -90,7 +91,7 @@ public struct LyricsSideView: View {
                         }
                         .padding(.trailing, 12)
                     }
-                    .frame(height: 96)
+                    .frame(height: scrollHeight)
                     .clipped()
                     .onAppear {
                         scrollToActiveLine(proxy: proxy, animated: false)

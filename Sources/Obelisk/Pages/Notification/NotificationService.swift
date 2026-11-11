@@ -17,6 +17,7 @@ public final class NotificationService: ObservableObject {
     private init() {
         loadRecentNotifications()
         setupDistributedNotificationListener()
+        setupApplicationActivationListener()
     }
 
     /// Sets up an inter-process distributed notification observer so external scripts,
@@ -79,15 +80,17 @@ public final class NotificationService: ObservableObject {
             BiometricPrivacyService.shared.lock()
         }
 
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
+        let isAlreadyShowing = (self.activeNotification != nil)
+
+        withAnimation(.spring(response: isAlreadyShowing ? 0.26 : 0.34, dampingFraction: 0.80)) {
             self.activeNotification = notification
             if !WindowManager.shared.isExpanded {
-                WindowManager.shared.updateCompactWidth(animated: false)
+                WindowManager.shared.updateCompactWidth(animated: true)
             }
         }
 
-        // Schedule auto-dismiss for unhandled standby HUD
-        let timeout = max(5.0, ObeliskSettings.shared.notificationAutoDismissSeconds)
+        // Snappy auto-dismiss: brief appearance (default 2.5s) so rapid / spam messages pop dynamically
+        let timeout = min(max(1.5, ObeliskSettings.shared.notificationAutoDismissSeconds), 5.0)
         scheduleAutoDismiss(seconds: timeout)
     }
 
@@ -152,6 +155,86 @@ public final class NotificationService: ObservableObject {
         }) {
             running.activate(options: .activateIgnoringOtherApps)
         }
+        removeRecentNotification(id: notification.id)
+    }
+
+    /// Automatically clears pending notifications when the user opens or switches to the target application,
+    /// matching native macOS Notification Center and iOS behavior.
+    private func setupApplicationActivationListener() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            Task { @MainActor in
+                self?.handleApplicationActivated(app)
+            }
+        }
+    }
+
+    /// Handles application focus switches: automatically dismisses pending HUD and clears notifications
+    /// for the application the user just opened.
+    public func handleApplicationActivated(_ app: NSRunningApplication) {
+        let bundleID = app.bundleIdentifier?.lowercased() ?? ""
+        let appName = app.localizedName?.lowercased() ?? ""
+
+        guard !bundleID.isEmpty || !appName.isEmpty else { return }
+
+        // 1. If the active standby notch HUD notification belongs to this application, dismiss it immediately
+        if let active = activeNotification, notification(active, matchesAppBundleID: bundleID, appName: appName) {
+            dismissNotification()
+        }
+
+        // 2. In notification history feed: remove notifications for this application
+        let toRemove = recentNotifications.filter { notification($0, matchesAppBundleID: bundleID, appName: appName) }
+        guard !toRemove.isEmpty else { return }
+
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+            recentNotifications.removeAll { notification($0, matchesAppBundleID: bundleID, appName: appName) }
+            saveRecentNotifications()
+        }
+    }
+
+    private func notification(_ notif: ObeliskNotification, matchesAppBundleID bundleID: String, appName: String) -> Bool {
+        let notifBundle = notif.bundleIdentifier.lowercased()
+        let notifApp = notif.appName.lowercased()
+
+        // 1. Direct bundle identifier match
+        if !bundleID.isEmpty && notifBundle == bundleID {
+            return true
+        }
+
+        // 2. Direct localized app name match
+        if !appName.isEmpty && notifApp == appName {
+            return true
+        }
+
+        // 3. WhatsApp variants (e.g. net.whatsapp.WhatsApp or Catalyst wrapper)
+        if (bundleID.contains("whatsapp") || appName.contains("whatsapp")) &&
+           (notifBundle.contains("whatsapp") || notifApp.contains("whatsapp")) {
+            return true
+        }
+
+        // 4. Telegram variants
+        if (bundleID.contains("telegram") || appName.contains("telegram")) &&
+           (notifBundle.contains("telegram") || notifApp.contains("telegram")) {
+            return true
+        }
+
+        // 5. Slack variants
+        if (bundleID.contains("slack") || appName.contains("slack")) &&
+           (notifBundle.contains("slack") || notifApp.contains("slack")) {
+            return true
+        }
+
+        // 6. Discord variants
+        if (bundleID.contains("discord") || appName.contains("discord")) &&
+           (notifBundle.contains("discord") || notifApp.contains("discord")) {
+            return true
+        }
+
+        return false
     }
 
     /// Removes a specific notification from recent history.

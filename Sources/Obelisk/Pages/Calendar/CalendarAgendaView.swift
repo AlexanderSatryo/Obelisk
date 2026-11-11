@@ -52,6 +52,10 @@ public struct CalendarAgendaView: View {
         }
     }
 
+    private var contentHeight: CGFloat {
+        max(90, 114 + CGFloat(settings.expandedHeightOffset))
+    }
+
     public var body: some View {
         HStack(alignment: .center, spacing: 0) {
             agendaColumn
@@ -59,13 +63,13 @@ public struct CalendarAgendaView: View {
 
             Rectangle()
                 .fill(Color.white.opacity(0.12))
-                .frame(width: 1, height: 96)
+                .frame(width: 1, height: max(70, contentHeight - 18))
                 .padding(.horizontal, 10)
 
             monthColumn
                 .frame(maxWidth: .infinity, alignment: .center)
         }
-        .frame(height: 114)
+        .frame(height: contentHeight)
         .padding(.top, 2)
         .brightness((settings.colorBrightness - 1.0) * 0.40)
         .onAppear {
@@ -77,7 +81,8 @@ public struct CalendarAgendaView: View {
 
     private var agendaColumn: some View {
         let todayEvents = calendarService.events(on: Date(), includePassed: false)
-        let visible = Array(todayEvents.prefix(3))
+        let maxEvents = settings.expandedHeightOffset > 30 ? 5 : (settings.expandedHeightOffset > 10 ? 4 : 3)
+        let visible = Array(todayEvents.prefix(maxEvents))
         let isTodayRedDay = calendarService.isRedDay(on: Date())
 
         return VStack(alignment: .leading, spacing: 0) {

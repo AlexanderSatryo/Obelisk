@@ -24,6 +24,10 @@ public struct NotificationHistoryView: View {
         }
     }
 
+    private var contentHeight: CGFloat {
+        max(90, 114 + CGFloat(settings.expandedHeightOffset))
+    }
+
     public var body: some View {
         VStack(spacing: 6) {
             if isLocked {
@@ -36,7 +40,7 @@ public struct NotificationHistoryView: View {
                 recentFeedView
             }
         }
-        .frame(height: 114)
+        .frame(height: contentHeight)
         .padding(.top, 2)
         .onAppear {
             RealNotificationMonitor.shared.backfillUnenrichedWhatsAppNotifications()
