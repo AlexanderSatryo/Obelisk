@@ -33,7 +33,7 @@ public struct RootView: View {
         guard !windowManager.isExpanded,
               let hud = telemetry.activeTransientHUD else { return false }
         switch hud {
-        case .volume, .brightness, .battery, .deviceConnected, .deviceDisconnected, .capsLock, .download:
+        case .volume, .brightness, .battery, .deviceConnected, .deviceDisconnected, .capsLock, .download, .scheduledAlert:
             return true
         }
     }
@@ -133,6 +133,13 @@ public struct RootView: View {
                     CompactNotchView(windowManager: windowManager)
                         .opacity(telemetry.activeTransientHUD != nil ? 0 : 1)
                         .allowsHitTesting(telemetry.activeTransientHUD == nil)
+                        .pointingHandCursor()
+                        .onTapGesture {
+                            guard !ScreenGeometry.isMissionControlActive() else { return }
+                            if !windowManager.isExpanded && settings.triggerMode != .hoverOnly {
+                                windowManager.expand()
+                            }
+                        }
                 }
             }
             .frame(width: currentWidth, height: currentHeight, alignment: .top)
@@ -144,17 +151,6 @@ public struct RootView: View {
                 y: showsExpanded ? 7 : 0
             )
             .contentShape(NotchShape(bottomRadius: currentRadius, topEarRadius: currentTopEarRadius))
-            .pointingHandCursor()
-            .onTapGesture {
-                guard !ScreenGeometry.isMissionControlActive() else { return }
-                if !windowManager.isExpanded {
-                    if notificationService.activeNotification != nil {
-                        windowManager.expand(openingTab: .notification)
-                    } else if settings.triggerMode != .hoverOnly {
-                        windowManager.expand()
-                    }
-                }
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

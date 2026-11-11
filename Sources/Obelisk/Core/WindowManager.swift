@@ -8,7 +8,8 @@ public enum ObeliskTab: Int, CaseIterable {
     case weather = 1
     case calendar = 2
     case file = 3
-    case notification = 4
+    case alert = 4
+    case notification = 5
 
     public var icon: String {
         switch self {
@@ -16,6 +17,7 @@ public enum ObeliskTab: Int, CaseIterable {
         case .weather: return "cloud.sun.fill"
         case .calendar: return "calendar"
         case .file: return "tray.and.arrow.down.fill"
+        case .alert: return "alarm.fill"
         case .notification: return "bell.fill"
         }
     }
@@ -26,6 +28,7 @@ public enum ObeliskTab: Int, CaseIterable {
         case .weather: return "Weather"
         case .calendar: return "Calendar"
         case .file: return "File"
+        case .alert: return "Alerts"
         case .notification: return "Notifications"
         }
     }
@@ -79,6 +82,8 @@ public final class WindowManager: ObservableObject {
             if settings.enabledTabs.contains(.calendar) { self.currentTab = .calendar }
         case .alwaysFile:
             if settings.enabledTabs.contains(.file) { self.currentTab = .file }
+        case .alwaysAlert:
+            if settings.enabledTabs.contains(.alert) { self.currentTab = .alert }
         case .alwaysNotification:
             if settings.enabledTabs.contains(.notification) { self.currentTab = .notification }
         }
@@ -273,6 +278,13 @@ public final class WindowManager: ObservableObject {
                 } else if isBatteryHUD, case .battery(let pct, let isCharging, let statusText) = hud {
                     let wingW = computeBatteryWingWidth(statusText: statusText, percentage: pct, isCharging: isCharging)
                     extraWidth = max(CGFloat(settings.compactWidthOffset), wingW * 2)
+                } else if case .scheduledAlert(let title, _) = hud {
+                    let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+                    let textW = ceil((title as NSString).size(withAttributes: [.font: font]).width)
+                    let rightWingNeeded: CGFloat = textW + 68
+                    let leftWingNeeded: CGFloat = 88
+                    let wingW = max(leftWingNeeded, rightWingNeeded)
+                    extraWidth = max(CGFloat(settings.compactWidthOffset), max(320, wingW * 2))
                 } else {
                     let hudExtra: CGFloat
                     if isVolOrBright {
@@ -300,12 +312,15 @@ public final class WindowManager: ObservableObject {
             let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
             let nameWidth = ceil((notif.appName as NSString).size(withAttributes: [.font: font]).width)
             let leftContentWidth = 16 + 6 + nameWidth
-            let rightContentWidth: CGFloat = 118 // "New Notifications!"
-            let sideMargin: CGFloat = 18
+
+            let rightText = NotificationNotchView.computeRightWingLabel(notification: notif, settings: settings)
+            let rightContentWidth = ceil((rightText as NSString).size(withAttributes: [.font: font]).width)
+
+            let sideMargin: CGFloat = 22
             let leftWingNeeded = leftContentWidth + (sideMargin * 2)
             let rightWingNeeded = rightContentWidth + (sideMargin * 2)
             let desiredWing = max(leftWingNeeded, rightWingNeeded)
-            let wingW = min(max(desiredWing, 130), 152)
+            let wingW = min(max(desiredWing, 140), 280)
             targetWidth = baseWidth + (wingW * 2)
             targetHeight = customBaseHeight
         } else {
@@ -408,11 +423,17 @@ public final class WindowManager: ObservableObject {
 
         window.ignoresMouseEvents = false
         window.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
 
         let resp = settings.animationSpeed.expandResponse
         withAnimation(.spring(response: resp, dampingFraction: 0.84, blendDuration: 0)) {
             self.isExpanded = true
         }
+    }
+
+    public func setIgnoresMouseEvents(_ ignores: Bool) {
+        window?.ignoresMouseEvents = ignores
     }
 
     /// Collapses the expanded dashboard back into the compact notch state and stops any active camera mirror.
@@ -432,14 +453,20 @@ public final class WindowManager: ObservableObject {
         CalendarService.shared.isCalendarExpanded = false
         BiometricPrivacyService.shared.lock()
         NSCursor.arrow.set()
+        self.window?.resignKey()
 
         // If Mission Control is active, immediately collapse without animation delay to keep notch completely static
         if ScreenGeometry.isMissionControlActive(), let win = self.window {
             self.isExpanded = false
             self.isCollapsing = false
-            win.ignoresMouseEvents = true
+            if HardwareTelemetryService.shared.activeTransientHUD == nil && NotificationService.shared.activeNotification == nil {
+                win.ignoresMouseEvents = true
+            }
             return
         }
+
+        // Accurately compute compact dimensions so the morph targets the exact width of any active notification or HUD
+        self.updateCompactWidth(animated: false)
 
         let resp = ObeliskSettings.shared.animationSpeed.collapseResponse
         withAnimation(.spring(response: resp, dampingFraction: 0.88, blendDuration: 0)) {
@@ -449,11 +476,14 @@ public final class WindowManager: ObservableObject {
         collapseWindowWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self = self, !self.isExpanded, let win = self.window else { return }
-            win.ignoresMouseEvents = true
+            if HardwareTelemetryService.shared.activeTransientHUD == nil && NotificationService.shared.activeNotification == nil {
+                win.ignoresMouseEvents = true
+            }
             self.isCollapsing = false
             self.collapseWindowWorkItem = nil
             self.lastCollapseTime = Date()
             NSCursor.arrow.set()
+        self.window?.resignKey()
         }
         collapseWindowWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + resp + 0.05, execute: work)
@@ -653,6 +683,13 @@ public final class WindowManager: ObservableObject {
                 return
             }
 
+            // When a scheduled alert is active in standby, do not auto-expand on hover
+            // so the user can easily click the [ OK ] button on the standby notch
+            if case .scheduledAlert = HardwareTelemetryService.shared.activeTransientHUD {
+                hoverStartTime = nil
+                return
+            }
+
             if !self.isHovered {
                 self.isHovered = true
                 NSCursor.pointingHand.set()
@@ -672,6 +709,7 @@ public final class WindowManager: ObservableObject {
             if self.isHovered {
                 self.isHovered = false
                 NSCursor.arrow.set()
+        self.window?.resignKey()
             }
         }
     }
@@ -726,6 +764,7 @@ public final class WindowManager: ObservableObject {
             if isHovered {
                 self.isHovered = false
                 NSCursor.arrow.set()
+        self.window?.resignKey()
             }
             return
         }
@@ -742,6 +781,7 @@ public final class WindowManager: ObservableObject {
                 self.isHovered = false
                 hoverStartTime = nil
                 NSCursor.arrow.set()
+        self.window?.resignKey()
             }
         }
     }
@@ -777,6 +817,8 @@ public final class WindowManager: ObservableObject {
             candidate = .calendar
         case .alwaysFile:
             candidate = .file
+        case .alwaysAlert:
+            candidate = .alert
         case .alwaysNotification:
             candidate = .notification
         }
@@ -788,6 +830,8 @@ public final class WindowManager: ObservableObject {
 
     /// Switches directly to the specified tab and updates the container height.
     public func switchToTab(_ tab: ObeliskTab, updateLastActiveTab: Bool = true) {
+        NSApp.activate(ignoringOtherApps: true)
+        self.window?.makeKeyAndOrderFront(nil)
         let resp = ObeliskSettings.shared.animationSpeed.expandResponse
         withAnimation(.spring(response: resp, dampingFraction: 0.82)) {
             self.currentTab = tab

@@ -208,7 +208,7 @@ public final class RealNotificationMonitor: ObservableObject {
 
         // If this notification is from WhatsApp, poll WhatsApp's live chat list & open message table across short intervals
         if bundleID == "net.whatsapp.WhatsApp" {
-            for delay in [0.04, 0.16, 0.35, 0.65, 1.10, 1.75] {
+            for delay in [0.08, 0.22, 0.45, 0.75, 1.15, 1.70, 2.40, 3.20] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     guard let self = self else { return }
                     self.pollWhatsAppChatList(for: deliveryID)
@@ -554,6 +554,9 @@ public final class RealNotificationMonitor: ObservableObject {
         guard !receivedRows.isEmpty else { return }
 
         let now = Date()
+        let deliveryTime = pendingDeliveries[idx].timestamp
+        let elapsed = now.timeIntervalSince(deliveryTime)
+
         recentMatchedWhatsAppSignatures = recentMatchedWhatsAppSignatures.filter {
             now.timeIntervalSince($0.value) < 45.0
         }
@@ -597,9 +600,11 @@ public final class RealNotificationMonitor: ObservableObject {
                 ?? receivedRows.first(where: { $0.matchesCurrentMinute })
         }
 
-        // 6. Top unread or unpinned received row
-        if matchedRow == nil {
-            matchedRow = receivedRows.first(where: { $0.isUnread && !$0.isPinned })
+        // 6. Only allow fallback to top unread or top unpinned row on later polls (elapsed >= 0.8s)
+        // Never prematurely lock in a stale message at 0.08s or 0.22s before WhatsApp updates its UI!
+        if matchedRow == nil && elapsed >= 0.8 {
+            matchedRow = receivedRows.first(where: { isUnused($0) && $0.isUnread })
+                ?? receivedRows.first(where: { $0.isUnread && !$0.isPinned })
                 ?? receivedRows.first(where: { $0.isUnread })
                 ?? receivedRows.first(where: { !$0.isPinned })
         }
@@ -645,11 +650,14 @@ public final class RealNotificationMonitor: ObservableObject {
                     !($0.timeToken.isEmpty) && itemTokens.contains($0.timeToken) &&
                     !usedSignatures.contains("\($0.sender)|\($0.groupName ?? "")|\($0.message)")
                 })
+                let unreadMatch = rows.first(where: {
+                    $0.isUnread && !usedSignatures.contains("\($0.sender)|\($0.groupName ?? "")|\($0.message)")
+                })
                 let fallbackMatch = unreadOrRecent.first(where: {
                     !usedSignatures.contains("\($0.sender)|\($0.groupName ?? "")|\($0.message)")
-                })
+                }) ?? unreadOrRecent.first
 
-                if let matched = tokenMatch ?? fallbackMatch {
+                if let matched = tokenMatch ?? unreadMatch ?? fallbackMatch {
                     let sig = "\(matched.sender)|\(matched.groupName ?? "")|\(matched.message)"
                     usedSignatures.insert(sig)
                     service.enrichNotification(
@@ -660,31 +668,30 @@ public final class RealNotificationMonitor: ObservableObject {
                         message: matched.message,
                         groupName: matched.groupName
                     )
-                } else {
-                    service.removeRecentNotification(id: item.id)
                 }
             }
         }
     }
 
-    private func resolveWhatsAppRootWindow(for axApp: AXUIElement) -> AXUIElement {
+    private func resolveWhatsAppCandidateRoots(for axApp: AXUIElement) -> [AXUIElement] {
+        var roots: [AXUIElement] = []
         var mainWinRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &mainWinRef) == .success,
            let mainWin = mainWinRef {
-            return mainWin as! AXUIElement
+            roots.append(mainWin as! AXUIElement)
         }
         var focusedWinRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &focusedWinRef) == .success,
            let focusedWin = focusedWinRef {
-            return focusedWin as! AXUIElement
+            roots.append(focusedWin as! AXUIElement)
         }
         var windowsRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
-           let windows = windowsRef as? [AXUIElement],
-           let firstWin = windows.first {
-            return firstWin
+           let windows = windowsRef as? [AXUIElement] {
+            roots.append(contentsOf: windows)
         }
-        return axApp
+        roots.append(axApp)
+        return roots
     }
 
     private func readWhatsAppChatRows(includeOpenChatBubbles: Bool = true) -> [ParsedWhatsAppRow] {
@@ -693,57 +700,63 @@ public final class RealNotificationMonitor: ObservableObject {
         guard let app = apps.first else { return [] }
 
         let axApp = AXUIElementCreateApplication(app.processIdentifier)
-        let rootWindow = resolveWhatsAppRootWindow(for: axApp)
+        let candidateRoots = resolveWhatsAppCandidateRoots(for: axApp)
         let currentTimeTokens = Self.timeTokens(for: Date())
         var parsedRows: [ParsedWhatsAppRow] = []
 
-        // 1. Read open chat message bubbles from `ChatMessagesTableView` (newest first) so rapid messages
-        //    in an active conversation are all captured even if the user immediately replies.
-        if includeOpenChatBubbles,
-           let msgTable = findAXElement(withIdentifier: "ChatMessagesTableView", in: rootWindow) {
-            var tableDescRef: CFTypeRef?
-            var cellsRef: CFTypeRef?
-            AXUIElementCopyAttributeValue(msgTable, kAXDescriptionAttribute as CFString, &tableDescRef)
-            AXUIElementCopyAttributeValue(msgTable, kAXChildrenAttribute as CFString, &cellsRef)
+        for rootWindow in candidateRoots {
+            // 1. Read open chat message bubbles from `ChatMessagesTableView` (newest first) so rapid messages
+            //    in an active conversation are all captured even if the user immediately replies.
+            if includeOpenChatBubbles,
+               let msgTable = findAXElement(withIdentifier: "ChatMessagesTableView", in: rootWindow) {
+                var tableDescRef: CFTypeRef?
+                var cellsRef: CFTypeRef?
+                AXUIElementCopyAttributeValue(msgTable, kAXDescriptionAttribute as CFString, &tableDescRef)
+                AXUIElementCopyAttributeValue(msgTable, kAXChildrenAttribute as CFString, &cellsRef)
 
-            let rawTableDesc = ObeliskNotification.stripBidiControlMarks(tableDescRef as? String ?? "")
-            let prefix = "Messages in chat with "
-            let openChatTitle = rawTableDesc.hasPrefix(prefix)
-                ? ObeliskNotification.stripBidiControlMarks(String(rawTableDesc.dropFirst(prefix.count)))
-                : ""
+                let rawTableDesc = ObeliskNotification.stripBidiControlMarks(tableDescRef as? String ?? "")
+                let prefix = "Messages in chat with "
+                let openChatTitle = rawTableDesc.hasPrefix(prefix)
+                    ? ObeliskNotification.stripBidiControlMarks(String(rawTableDesc.dropFirst(prefix.count)))
+                    : ""
 
-            if !openChatTitle.isEmpty, openChatTitle != "You",
-               let cells = cellsRef as? [AXUIElement] {
-                for cell in cells.suffix(10).reversed() {
-                    var cellDescRef: CFTypeRef?
-                    AXUIElementCopyAttributeValue(cell, kAXDescriptionAttribute as CFString, &cellDescRef)
-                    let rawCellDesc = cellDescRef as? String ?? ""
-                    guard !rawCellDesc.isEmpty else { continue }
-                    if let parsed = parseWhatsAppRow(desc: openChatTitle, val: rawCellDesc, currentTimeTokens: currentTimeTokens),
-                       !parsed.isSentByMe {
-                        parsedRows.append(parsed)
+                if !openChatTitle.isEmpty, openChatTitle != "You",
+                   let cells = cellsRef as? [AXUIElement] {
+                    for cell in cells.suffix(10).reversed() {
+                        var cellDescRef: CFTypeRef?
+                        AXUIElementCopyAttributeValue(cell, kAXDescriptionAttribute as CFString, &cellDescRef)
+                        let rawCellDesc = cellDescRef as? String ?? ""
+                        guard !rawCellDesc.isEmpty else { continue }
+                        if let parsed = parseWhatsAppRow(desc: openChatTitle, val: rawCellDesc, currentTimeTokens: currentTimeTokens),
+                           !parsed.isSentByMe {
+                            parsedRows.append(parsed)
+                        }
                     }
                 }
             }
-        }
 
-        // 2. Read chat list rows from `ChatListView_TableView`
-        if let table = findAXElement(withIdentifier: "ChatListView_TableView", in: rootWindow) {
-            var childrenRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(table, kAXChildrenAttribute as CFString, &childrenRef) == .success,
-               let children = childrenRef as? [AXUIElement] {
-                for row in children.prefix(15) {
-                    var descRef: CFTypeRef?
-                    var valRef: CFTypeRef?
-                    AXUIElementCopyAttributeValue(row, kAXDescriptionAttribute as CFString, &descRef)
-                    AXUIElementCopyAttributeValue(row, kAXValueAttribute as CFString, &valRef)
+            // 2. Read chat list rows from `ChatListView_TableView`
+            if let table = findAXElement(withIdentifier: "ChatListView_TableView", in: rootWindow) {
+                var childrenRef: CFTypeRef?
+                if AXUIElementCopyAttributeValue(table, kAXChildrenAttribute as CFString, &childrenRef) == .success,
+                   let children = childrenRef as? [AXUIElement] {
+                    for row in children.prefix(15) {
+                        var descRef: CFTypeRef?
+                        var valRef: CFTypeRef?
+                        AXUIElementCopyAttributeValue(row, kAXDescriptionAttribute as CFString, &descRef)
+                        AXUIElementCopyAttributeValue(row, kAXValueAttribute as CFString, &valRef)
 
-                    let rawDesc = descRef as? String ?? ""
-                    let rawVal = valRef as? String ?? ""
-                    if let parsed = parseWhatsAppRow(desc: rawDesc, val: rawVal, currentTimeTokens: currentTimeTokens) {
-                        parsedRows.append(parsed)
+                        let rawDesc = descRef as? String ?? ""
+                        let rawVal = valRef as? String ?? ""
+                        if let parsed = parseWhatsAppRow(desc: rawDesc, val: rawVal, currentTimeTokens: currentTimeTokens) {
+                            parsedRows.append(parsed)
+                        }
                     }
                 }
+            }
+
+            if !parsedRows.isEmpty {
+                break
             }
         }
 
@@ -777,12 +790,12 @@ public final class RealNotificationMonitor: ObservableObject {
     }
 
     private func parseWhatsAppRow(desc: String, val: String, currentTimeTokens: Set<String>) -> ParsedWhatsAppRow? {
-        let d = ObeliskNotification.stripBidiControlMarks(desc)
-        let v = ObeliskNotification.stripBidiControlMarks(val)
+        let d = ObeliskNotification.stripBidiControlMarks(desc).trimmingCharacters(in: .whitespacesAndNewlines)
+        let v = ObeliskNotification.stripBidiControlMarks(val).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !d.isEmpty, !v.isEmpty else { return nil }
 
-        let isSentByMe = v.contains(", Sent to ") || v.hasPrefix("Your ")
-        let isPinned = v.hasSuffix(", Pinned")
+        let isSentByMe = v.contains(", Sent to ") || v.hasPrefix("Your message") || v.hasPrefix("Your ") || v.hasPrefix("You: ")
+        let isPinned = v.hasSuffix(", Pinned") || v.contains(", Pinned,") || v.contains(", Pinned")
         let isGroupChat = v.range(of: #",\s*Received\s+in\s+"#, options: .regularExpression) != nil
 
         var isUnread = false
@@ -793,16 +806,26 @@ public final class RealNotificationMonitor: ObservableObject {
         }
 
         var body = v
-        for suffix in [", Pinned", ", Muted", ". Mentioned.", ", Mentioned"] {
-            if body.hasSuffix(suffix) {
-                body = String(body.dropLast(suffix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Strip trailing status and mute/pinned suffixes
+        let knownSuffixes = [", Pinned", ", Muted", ". Mentioned.", ", Mentioned", ", Delivered", ", Read", ", Played", ", Sent"]
+        var strippedSuffix = true
+        while strippedSuffix {
+            strippedSuffix = false
+            for suffix in knownSuffixes {
+                if body.hasSuffix(suffix) {
+                    body = String(body.dropLast(suffix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    strippedSuffix = true
+                }
             }
         }
 
+        // Strip trailing ", Received in <GroupName>" or ", Received from <Sender>" or ", Sent to <Name>"
         if let recRange = body.range(of: #",\s*(Received|Sent)\s+(from|in|to)\s+.*$"#, options: .regularExpression) {
             body = String(body[..<recRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
+        // Extract trailing time token (e.g. ", 15.04", ", 15:04", ", 3:45 PM", ", Yesterday")
         var extractedTimeToken = ""
         var matchesCurrentMinute = false
         if let timeRange = body.range(of: #",\s*(\d{1,2}[\.:]\d{2}(\s*[APap][Mm])?|Yesterday|Kemarin|\d{1,2}\s+[A-Za-z]+.*)$"#, options: .regularExpression) {
@@ -818,29 +841,55 @@ public final class RealNotificationMonitor: ObservableObject {
 
         var sender = chatTitle
         var groupName: String? = nil
-        if body.lowercased().hasPrefix("message, ") {
-            body = String(body.dropFirst("message, ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
-        } else if body.hasPrefix("Message from ") {
-            let rest = String(body.dropFirst("Message from ".count))
-            if let commaIdx = rest.firstIndex(of: ",") {
-                let groupSender = ObeliskNotification.stripBidiControlMarks(String(rest[..<commaIdx]))
-                let msgPart = ObeliskNotification.stripBidiControlMarks(String(rest[rest.index(after: commaIdx)...]))
-                if !groupSender.isEmpty {
-                    sender = groupSender
-                    groupName = chatTitle
+
+        // Parse sender and message body
+        // Case A: Media or message with "from <Sender>" at the beginning:
+        // e.g. "Photo from Maybe Rayhan, WE ARE HIRING!" or "Sticker from Predi Ketintunk" or "Message from Alice, Hello"
+        if let prefixMediaRegex = try? NSRegularExpression(
+            pattern: #"^(?:Photo|Video|Sticker|Audio|Voice message|Document|Contact|Location|GIF|Message)\s+from\s+([^,]+)(?:,\s*([\s\S]*))?$"#,
+            options: .caseInsensitive
+        ) {
+            let nsBody = body as NSString
+            let fullRange = NSRange(location: 0, length: nsBody.length)
+            if let match = prefixMediaRegex.firstMatch(in: body, options: [], range: fullRange) {
+                let senderRange = match.range(at: 1)
+                if senderRange.location != NSNotFound {
+                    let extractedSender = ObeliskNotification.stripBidiControlMarks(nsBody.substring(with: senderRange)).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !extractedSender.isEmpty {
+                        sender = extractedSender
+                        if isGroupChat {
+                            groupName = chatTitle
+                        }
+                    }
                 }
-                body = msgPart
-            }
-        } else if isGroupChat, let fromRange = body.range(of: #"\s+from\s+([^,]+)$"#, options: .regularExpression) {
-            let fullMatch = String(body[fromRange])
-            let extractedSender = ObeliskNotification.stripBidiControlMarks(
-                fullMatch.replacingOccurrences(of: #"^\s+from\s+"#, with: "", options: .regularExpression)
-            )
-            let msgPart = ObeliskNotification.stripBidiControlMarks(String(body[..<fromRange.lowerBound]))
-            if !extractedSender.isEmpty && !msgPart.isEmpty {
-                sender = extractedSender
-                groupName = chatTitle
-                body = msgPart
+                if match.numberOfRanges > 2 {
+                    let msgRange = match.range(at: 2)
+                    if msgRange.location != NSNotFound {
+                        let restMsg = ObeliskNotification.stripBidiControlMarks(nsBody.substring(with: msgRange)).trimmingCharacters(in: .whitespacesAndNewlines)
+                        body = restMsg.isEmpty ? body : restMsg
+                    }
+                }
+            } else if body.lowercased().hasPrefix("message, ") {
+                body = String(body.dropFirst("message, ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if body.lowercased().hasPrefix("document, ") {
+                body = String(body.dropFirst("document, ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if body.lowercased().hasPrefix("photo, ") {
+                body = String(body.dropFirst("photo, ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if body.lowercased().hasPrefix("video, ") {
+                body = String(body.dropFirst("video, ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if body.lowercased().hasPrefix("audio, ") {
+                body = String(body.dropFirst("audio, ".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if isGroupChat, let fromRange = body.range(of: #"\s+from\s+([^,]+)$"#, options: .regularExpression) {
+                let fullMatch = String(body[fromRange])
+                let extractedSender = ObeliskNotification.stripBidiControlMarks(
+                    fullMatch.replacingOccurrences(of: #"^\s+from\s+"#, with: "", options: .regularExpression)
+                ).trimmingCharacters(in: .whitespacesAndNewlines)
+                let msgPart = ObeliskNotification.stripBidiControlMarks(String(body[..<fromRange.lowerBound])).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !extractedSender.isEmpty && !msgPart.isEmpty {
+                    sender = extractedSender
+                    groupName = chatTitle
+                    body = msgPart
+                }
             }
         }
 

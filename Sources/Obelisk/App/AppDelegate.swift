@@ -20,6 +20,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = CameraMirrorService.shared
         _ = BiometricPrivacyService.shared
         _ = NotificationService.shared
+        _ = ScheduledAlertService.shared
+        setupMainMenu()
         RealNotificationMonitor.shared.startMonitoring()
         SystemVolumeAndBrightnessMonitor.shared.startMonitoring()
         CapsLockMonitorService.shared.startMonitoring()
@@ -78,6 +80,22 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             selector: #selector(switchFile),
             name: Notification.Name("com.obelisk.switchFile"),
             object: nil
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(switchAlert),
+            name: Notification.Name("com.obelisk.switchAlert"),
+            object: nil,
+            suspensionBehavior: .deliverImmediately
+        )
+
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(testScheduledAlert),
+            name: Notification.Name("com.obelisk.testScheduledAlert"),
+            object: nil,
+            suspensionBehavior: .deliverImmediately
         )
 
         DistributedNotificationCenter.default().addObserver(
@@ -238,6 +256,35 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func setupMainMenu() {
+        let mainMenu = NSMenu()
+
+        // App Menu
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "About Obelisk", action: #selector(openSettings), keyEquivalent: "")
+        appMenu.addItem(NSMenuItem.separator())
+        appMenu.addItem(withTitle: "Quit Obelisk", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+
+        // Edit Menu (Enables standard macOS shortcuts across all UI text fields: Cmd+C, Cmd+V, Cmd+A, Cmd+X, Cmd+Z, Cmd+Shift+Z)
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redoItem = editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        redoItem.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        NSApp.mainMenu = mainMenu
+    }
+
     @objc private func handleMenuBarVisibilityChange() {
         updateStatusItemVisibility()
     }
@@ -335,6 +382,28 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func switchFile() {
         Task { @MainActor in
             WindowManager.shared.switchToTab(.file)
+        }
+    }
+
+    @objc private func switchAlert() {
+        Task { @MainActor in
+            let wm = WindowManager.shared
+            if !wm.isExpanded {
+                wm.expand(openingTab: .alert)
+            } else {
+                wm.switchToTab(.alert)
+            }
+        }
+    }
+
+    @objc private func testScheduledAlert() {
+        Task { @MainActor in
+            let alert = ScheduledAlertItem(
+                title: "Fill Work Attendance",
+                time: "08:30",
+                recurrence: .weekdays
+            )
+            ScheduledAlertService.shared.triggerAlert(alert)
         }
     }
 

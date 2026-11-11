@@ -364,6 +364,7 @@ public enum DefaultOpeningTab: String, CaseIterable, Identifiable, Equatable {
     case alwaysWeather = "alwaysWeather"
     case alwaysCalendar = "alwaysCalendar"
     case alwaysFile = "alwaysFile"
+    case alwaysAlert = "alwaysAlert"
     case alwaysNotification = "alwaysNotification"
 
     public var id: String { rawValue }
@@ -375,6 +376,7 @@ public enum DefaultOpeningTab: String, CaseIterable, Identifiable, Equatable {
         case .alwaysWeather: return "Always Open Weather"
         case .alwaysCalendar: return "Always Open Calendar"
         case .alwaysFile: return "Always Open File Shelf"
+        case .alwaysAlert: return "Always Open Scheduled Alerts"
         case .alwaysNotification: return "Always Open Notifications"
         }
     }
@@ -502,6 +504,9 @@ public struct ObeliskSettingsDraft: Equatable {
     public var enableWeatherTab: Bool = true
     public var enableCalendarTab: Bool = true
     public var enableFileTab: Bool = true
+    public var enableAlertTab: Bool = true
+    public var scheduledAlertDismissMinutes: Int = 5
+    public var scheduledAlertRequireOK: Bool = true
     public var enableNotificationTab: Bool = true
     public var showDownloadsOnStandby: Bool = true
     public var enableNotifications: Bool = true
@@ -537,6 +542,7 @@ public struct ObeliskSettingsDraft: Equatable {
         if enableWeatherTab { list.append(.weather) }
         if enableCalendarTab { list.append(.calendar) }
         if enableFileTab { list.append(.file) }
+        if enableAlertTab { list.append(.alert) }
         if enableNotificationTab { list.append(.notification) }
         if list.isEmpty { list.append(.media) }
         return list
@@ -603,6 +609,9 @@ public struct ObeliskSettingsDraft: Equatable {
             self.enableWeatherTab = def.enableWeatherTab
             self.enableCalendarTab = def.enableCalendarTab
             self.enableFileTab = def.enableFileTab
+            self.enableAlertTab = def.enableAlertTab
+            self.scheduledAlertDismissMinutes = def.scheduledAlertDismissMinutes
+            self.scheduledAlertRequireOK = def.scheduledAlertRequireOK
             self.enableNotificationTab = def.enableNotificationTab
             self.defaultOpeningTab = def.defaultOpeningTab
             self.fileTrayCapacity = def.fileTrayCapacity
@@ -827,6 +836,18 @@ public final class ObeliskSettings: ObservableObject {
             WindowManager.shared.ensureValidCurrentTab()
         }
     }
+    @Published public var enableAlertTab: Bool {
+        didSet {
+            defaults.set(enableAlertTab, forKey: "cfg_enableAlertTab")
+            WindowManager.shared.ensureValidCurrentTab()
+        }
+    }
+    @Published public var scheduledAlertDismissMinutes: Int {
+        didSet { defaults.set(scheduledAlertDismissMinutes, forKey: "cfg_scheduledAlertDismissMinutes") }
+    }
+    @Published public var scheduledAlertRequireOK: Bool {
+        didSet { defaults.set(scheduledAlertRequireOK, forKey: "cfg_scheduledAlertRequireOK") }
+    }
     @Published public var enableNotificationTab: Bool {
         didSet {
             defaults.set(enableNotificationTab, forKey: "cfg_enableNotificationTab")
@@ -1015,6 +1036,9 @@ public final class ObeliskSettings: ObservableObject {
         self.enableWeatherTab = defaults.object(forKey: "cfg_enableWeatherTab") as? Bool ?? true
         self.enableCalendarTab = defaults.object(forKey: "cfg_enableCalendarTab") as? Bool ?? true
         self.enableFileTab = defaults.object(forKey: "cfg_enableFileTab") as? Bool ?? (defaults.object(forKey: "cfg_enableSystemTab") as? Bool ?? true)
+        self.enableAlertTab = defaults.object(forKey: "cfg_enableAlertTab") as? Bool ?? true
+        self.scheduledAlertDismissMinutes = defaults.object(forKey: "cfg_scheduledAlertDismissMinutes") as? Int ?? 5
+        self.scheduledAlertRequireOK = defaults.object(forKey: "cfg_scheduledAlertRequireOK") as? Bool ?? true
         self.enableNotificationTab = defaults.object(forKey: "cfg_enableNotificationTab") as? Bool ?? true
         self.showDownloadsOnStandby = defaults.object(forKey: "cfg_showDownloadsOnStandby") as? Bool ?? true
         self.enableNotifications = defaults.object(forKey: "cfg_enableNotifications") as? Bool ?? true
@@ -1098,6 +1122,9 @@ public final class ObeliskSettings: ObservableObject {
         d.enableWeatherTab = enableWeatherTab
         d.enableCalendarTab = enableCalendarTab
         d.enableFileTab = enableFileTab
+        d.enableAlertTab = enableAlertTab
+        d.scheduledAlertDismissMinutes = scheduledAlertDismissMinutes
+        d.scheduledAlertRequireOK = scheduledAlertRequireOK
         d.enableNotificationTab = enableNotificationTab
         d.showDownloadsOnStandby = showDownloadsOnStandby
         d.enableNotifications = enableNotifications
@@ -1170,6 +1197,9 @@ public final class ObeliskSettings: ObservableObject {
         enableWeatherTab = draft.enableWeatherTab
         enableCalendarTab = draft.enableCalendarTab
         enableFileTab = draft.enableFileTab
+        enableAlertTab = draft.enableAlertTab
+        scheduledAlertDismissMinutes = draft.scheduledAlertDismissMinutes
+        scheduledAlertRequireOK = draft.scheduledAlertRequireOK
         enableNotificationTab = draft.enableNotificationTab
         showDownloadsOnStandby = draft.showDownloadsOnStandby
         enableNotifications = draft.enableNotifications
@@ -1212,6 +1242,7 @@ public final class ObeliskSettings: ObservableObject {
         if enableWeatherTab { list.append(.weather) }
         if enableCalendarTab { list.append(.calendar) }
         if enableFileTab { list.append(.file) }
+        if enableAlertTab { list.append(.alert) }
         if enableNotificationTab { list.append(.notification) }
         if list.isEmpty { list.append(.media) }
         return list

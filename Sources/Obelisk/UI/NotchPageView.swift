@@ -25,6 +25,8 @@ public struct NotchPageView: View {
             CalendarAgendaView(calendarService: calendarService)
         case .file:
             FileTrayView()
+        case .alert:
+            ScheduledAlertsPageView()
         case .notification:
             NotificationHistoryView()
         }

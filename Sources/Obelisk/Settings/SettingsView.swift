@@ -275,6 +275,12 @@ public enum SettingsSearchIndex {
             keywords: ["calendar strip", "show event indicators", "event indicators", "event dots", "markers"]
         ),
         SettingsSearchItem(
+            id: "scheduledAlerts",
+            title: "Scheduled Alerts & Alarms",
+            category: .modules,
+            keywords: ["scheduled alerts & alarms", "scheduled alerts tab", "standby alert duration", "require ok to dismiss", "alarms", "reminders", "alert", "ok"]
+        ),
+        SettingsSearchItem(
             id: "downloads",
             title: "Downloads & Tasks",
             category: .modules,
@@ -397,6 +403,7 @@ public struct SettingsView: View {
         if draft.enableWeatherTab { options.append((.alwaysWeather, DefaultOpeningTab.alwaysWeather.title)) }
         if draft.enableCalendarTab { options.append((.alwaysCalendar, DefaultOpeningTab.alwaysCalendar.title)) }
         if draft.enableFileTab { options.append((.alwaysFile, DefaultOpeningTab.alwaysFile.title)) }
+        if draft.enableAlertTab { options.append((.alwaysAlert, DefaultOpeningTab.alwaysAlert.title)) }
         if draft.enableNotificationTab { options.append((.alwaysNotification, DefaultOpeningTab.alwaysNotification.title)) }
         return options
     }
@@ -1635,6 +1642,13 @@ public struct SettingsView: View {
                     )
 
                     PreferenceToggleRow(
+                        title: "Scheduled Alerts Tab (Expanded Notch)",
+                        subtitle: "Dedicated dashboard tab before notifications to configure routine alarms and alerts",
+                        isHighlighted: matchesCurrentQuery("alerts") || matchesCurrentQuery("modules"),
+                        isOn: $draft.enableAlertTab
+                    )
+
+                    PreferenceToggleRow(
                         title: "Notification History Page (Expanded Notch)",
                         subtitle: "Dedicated dashboard tab to browse and search recent notifications",
                         isHighlighted: matchesCurrentQuery("notifications") || matchesCurrentQuery("modules"),
@@ -1762,6 +1776,48 @@ public struct SettingsView: View {
                         isHighlighted: matchesCurrentQuery("calendarEventDots") || matchesCurrentQuery("calendarModule"),
                         isOn: $draft.showCalendarEventDots
                     )
+                }
+            }
+
+            if isSectionVisible(["scheduledAlerts", "alerts"]) {
+                PreferenceSection(
+                    title: "SCHEDULED ALERTS & ALARMS",
+                    isHighlighted: matchesCurrentQuery("scheduledAlerts") || matchesCurrentQuery("alerts")
+                ) {
+                    PreferenceToggleRow(
+                        title: "Scheduled Alerts Tab",
+                        subtitle: "Dedicated dashboard tab before notifications to configure routine alarms and alerts",
+                        isHighlighted: matchesCurrentQuery("scheduledAlerts") || matchesCurrentQuery("alerts"),
+                        isOn: $draft.enableAlertTab
+                    )
+
+                    if draft.enableAlertTab {
+                        PreferenceRow(
+                            title: "Standby Alert Duration",
+                            subtitle: "How long routine alerts stay visible in the notch before auto-dismissing",
+                            isHighlighted: matchesCurrentQuery("scheduledAlerts") || matchesCurrentQuery("alerts")
+                        ) {
+                            ModernMenuPicker(
+                                selection: $draft.scheduledAlertDismissMinutes,
+                                options: [
+                                    (1, "1 Minute"),
+                                    (2, "2 Minutes"),
+                                    (3, "3 Minutes"),
+                                    (5, "5 Minutes"),
+                                    (10, "10 Minutes"),
+                                    (0, "Until Dismissed")
+                                ],
+                                width: 170
+                            )
+                        }
+
+                        PreferenceToggleRow(
+                            title: "Require OK to Dismiss",
+                            subtitle: "Keep alert visible in the standby notch until you click the OK button",
+                            isHighlighted: matchesCurrentQuery("scheduledAlerts") || matchesCurrentQuery("alerts"),
+                            isOn: $draft.scheduledAlertRequireOK
+                        )
+                    }
                 }
             }
         }
@@ -2680,6 +2736,30 @@ public struct SettingsView: View {
                     .padding(5)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.blue.opacity(0.3), lineWidth: 0.5))
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal, 10)
+                .brightness((draftToUse.colorBrightness - 1.0) * 0.40)
+
+            case .alert:
+                HStack(spacing: 6) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "alarm.fill").font(.system(size: 6.5, weight: .bold)).foregroundColor(Color(red: 255/255, green: 159/255, blue: 10/255))
+                            Text("Scheduled Alerts").font(.system(size: 6.5, weight: .bold)).foregroundColor(.white)
+                            Spacer()
+                            Text("1 Active").font(.system(size: 5.5, weight: .bold)).foregroundColor(.white.opacity(0.7))
+                        }
+                        VStack(alignment: .leading, spacing: 1.5) {
+                            HStack(spacing: 3) {
+                                Text("08:30").font(.system(size: 5.5, weight: .bold)).monospacedDigit().foregroundColor(Color(red: 255/255, green: 159/255, blue: 10/255))
+                                Text("Fill Work Attendance • Mon-Fri").font(.system(size: 5.5, weight: .medium)).foregroundColor(.white.opacity(0.85)).lineLimit(1)
+                            }
+                        }
+                    }
+                    .padding(5)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
                     .frame(maxWidth: .infinity)
                 }
                 .padding(.horizontal, 10)

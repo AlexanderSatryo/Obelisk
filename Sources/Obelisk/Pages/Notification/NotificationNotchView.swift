@@ -8,6 +8,32 @@ public struct NotificationNotchView: View {
     @ObservedObject var windowManager: WindowManager
     @ObservedObject var notificationService: NotificationService = .shared
     @ObservedObject var settings: ObeliskSettings = .shared
+    @ObservedObject var biometrics: BiometricPrivacyService = .shared
+
+    public static func computeRightWingLabel(
+        notification: ObeliskNotification,
+        settings: ObeliskSettings = .shared,
+        isUnlocked: Bool = BiometricPrivacyService.shared.isUnlocked
+    ) -> String {
+        if settings.requireTouchIDForNotifications && !isUnlocked {
+            return "New Notification"
+        }
+        let sender = notification.resolvedSenderName
+        if !sender.isEmpty && sender != notification.appName {
+            return sender
+        }
+        if let group = notification.resolvedGroupName, !group.isEmpty {
+            return group
+        }
+        if !notification.message.isEmpty && notification.message != "New notification received" {
+            return notification.message
+        }
+        return "New Notification"
+    }
+
+    private var rightWingLabel: String {
+        Self.computeRightWingLabel(notification: notification, settings: settings, isUnlocked: biometrics.isUnlocked)
+    }
 
     public var body: some View {
         let totalWidth = windowManager.compactWidth
@@ -34,9 +60,9 @@ public struct NotificationNotchView: View {
 
                 Color.clear.frame(width: bezelWidth, height: topRowHeight)
 
-                // Right Wing: [New Notifications!]
+                // Right Wing: [Sender / Message / New Notification]
                 HStack(spacing: 0) {
-                    Text("New Notifications!")
+                    Text(rightWingLabel)
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)

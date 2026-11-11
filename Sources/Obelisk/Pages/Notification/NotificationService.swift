@@ -84,9 +84,7 @@ public final class NotificationService: ObservableObject {
 
         withAnimation(.spring(response: isAlreadyShowing ? 0.26 : 0.34, dampingFraction: 0.80)) {
             self.activeNotification = notification
-            if !WindowManager.shared.isExpanded {
-                WindowManager.shared.updateCompactWidth(animated: true)
-            }
+            WindowManager.shared.updateCompactWidth(animated: !WindowManager.shared.isExpanded)
         }
 
         // Snappy auto-dismiss: brief appearance (default 2.5s) so rapid / spam messages pop dynamically
@@ -112,7 +110,10 @@ public final class NotificationService: ObservableObject {
             )
             recentNotifications[idx] = updated
             if activeNotification?.id == id {
-                activeNotification = updated
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    activeNotification = updated
+                    WindowManager.shared.updateCompactWidth(animated: !WindowManager.shared.isExpanded)
+                }
             }
             saveRecentNotifications()
         }

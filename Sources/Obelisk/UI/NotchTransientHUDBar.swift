@@ -79,6 +79,8 @@ public struct NotchTransientHUDBar: View {
             } else {
                 return ("arrow.down.circle", .white)
             }
+        case .scheduledAlert:
+            return ("bell.fill", Color(red: 255/255, green: 159/255, blue: 10/255))
         }
     }
 
@@ -108,6 +110,8 @@ public struct NotchTransientHUDBar: View {
             return "Caps Lock"
         case .download(let fileName, _, _, _):
             return fileName
+        case .scheduledAlert(let title, _):
+            return title
         }
     }
 
@@ -134,6 +138,8 @@ public struct NotchTransientHUDBar: View {
             return isOn ? "Caps Lock is on" : "Caps Lock is off"
         case .download(_, let statusText, _, _):
             return statusText
+        case .scheduledAlert(_, let time):
+            return "Scheduled Alert • \(time)"
         }
     }
 
@@ -258,6 +264,21 @@ public struct NotchTransientHUDBar: View {
                 Capsule()
                     .fill(isOn ? calmSageGreen.opacity(0.15) : Color.white.opacity(0.08))
             )
+        case .scheduledAlert:
+            Button(action: {
+                ScheduledAlertService.shared.dismissActiveAlert()
+            }) {
+                Text("OK")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule().fill(Color(red: 255/255, green: 159/255, blue: 10/255))
+                    )
+            }
+            .buttonStyle(.plain)
+            .pointingHandCursor()
         }
     }
 
@@ -272,9 +293,13 @@ public struct NotchTransientHUDBar: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle().fill(Color.white.opacity(0.10))
-                    Image(systemName: icon.name)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(icon.color)
+                    if case .scheduledAlert = hud {
+                        SwingingBellIconView(size: 18)
+                    } else {
+                        Image(systemName: icon.name)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(icon.color)
+                    }
                 }
                 .frame(width: 40, height: 40)
 
@@ -478,6 +503,16 @@ public struct NotchTransientHUDBar: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
+
+        case .scheduledAlert(_, let time):
+            HStack(spacing: 6) {
+                SwingingBellIconView(size: 12)
+                Text(time)
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+            }
         }
     }
 
@@ -601,6 +636,29 @@ public struct NotchTransientHUDBar: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
+            }
+
+        case .scheduledAlert(let title, _):
+            HStack(spacing: 7) {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                Button(action: {
+                    ScheduledAlertService.shared.dismissActiveAlert()
+                }) {
+                    Text("OK")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2.5)
+                        .background(
+                            Capsule().fill(Color(red: 255/255, green: 159/255, blue: 10/255))
+                        )
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
             }
         }
     }

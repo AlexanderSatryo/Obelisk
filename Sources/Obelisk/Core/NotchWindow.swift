@@ -18,7 +18,7 @@ public final class NotchWindow: NSPanel {
     public init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
@@ -51,11 +51,34 @@ public final class NotchWindow: NSPanel {
     }
 
     override public var canBecomeKey: Bool {
-        return false
+        return WindowManager.shared.isExpanded
     }
 
     override public var canBecomeMain: Bool {
-        return false
+        return WindowManager.shared.isExpanded
+    }
+
+    override public func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command) {
+            let key = event.charactersIgnoringModifiers?.lowercased()
+            switch key {
+            case "c":
+                if NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: self) { return true }
+            case "v":
+                if NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: self) { return true }
+            case "x":
+                if NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: self) { return true }
+            case "a":
+                if NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: self) { return true }
+            case "z":
+                let isRedo = event.modifierFlags.contains(.shift)
+                let sel = isRedo ? Selector(("redo:")) : Selector(("undo:"))
+                if NSApp.sendAction(sel, to: nil, from: self) { return true }
+            default:
+                break
+            }
+        }
+        return super.performKeyEquivalent(with: event)
     }
 
     override public func sendEvent(_ event: NSEvent) {
@@ -68,6 +91,12 @@ public final class NotchWindow: NSPanel {
                 return
             default:
                 break
+            }
+        }
+        if event.type == .leftMouseDown && WindowManager.shared.isExpanded {
+            if !self.isKeyWindow {
+                NSApp.activate(ignoringOtherApps: true)
+                self.makeKeyAndOrderFront(nil)
             }
         }
         if event.type == .scrollWheel {

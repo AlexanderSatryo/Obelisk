@@ -13,6 +13,7 @@ public enum NotchTransientHUD: Equatable, Hashable {
     case brightness(level: Double)
     case capsLock(isOn: Bool)
     case download(fileName: String, statusText: String, isSuccess: Bool, progress: Double? = nil)
+    case scheduledAlert(title: String, time: String)
 }
 
 /// Monitors real-time Apple Silicon hardware telemetry (CPU load, Unified Memory, SSD disk capacity,
@@ -113,6 +114,7 @@ public final class HardwareTelemetryService: ObservableObject {
             withAnimation(springAnimation) {
                 self.activeTransientHUD = hud
                 if !WindowManager.shared.isExpanded {
+                    WindowManager.shared.setIgnoresMouseEvents(false)
                     WindowManager.shared.updateCompactWidth(animated: false)
                 }
             }
@@ -128,6 +130,7 @@ public final class HardwareTelemetryService: ObservableObject {
                 withAnimation(dismissAnimation) {
                     self.activeTransientHUD = nil
                     if !WindowManager.shared.isExpanded {
+                        WindowManager.shared.setIgnoresMouseEvents(true)
                         WindowManager.shared.updateCompactWidth(animated: false)
                     }
                 }
@@ -147,6 +150,7 @@ public final class HardwareTelemetryService: ObservableObject {
         let update = {
             self.activeTransientHUD = nil
             if !WindowManager.shared.isExpanded {
+                WindowManager.shared.setIgnoresMouseEvents(true)
                 WindowManager.shared.updateCompactWidth(animated: false)
             }
         }
