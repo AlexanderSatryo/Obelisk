@@ -109,8 +109,10 @@ flowchart TD
 - **Standby Notch HUD & Swinging Bell Animation**:
   - Dispatches `NotchTransientHUD.scheduledAlert` to the compact notch with an animated pendulum-swinging bell glyph (`SwingingBellIconView`) on the left wing and the alert title + amber `[ OK ]` confirmation button on the right wing.
   - Keeps mouse interaction enabled while in standby alert mode so users can dismiss directly without opening the full dashboard. Auto-expand on hover is temporarily suspended to prevent accidental tab navigation during alarms.
-- **macOS Native Shortcut Integration**:
-  - Intercepts Command-key text manipulation shortcuts (`⌘C`, `⌘V`, `⌘A`, `⌘X`, `⌘Z`, `⇧⌘Z`) at the window key event dispatch level, allowing smooth copy/paste and undo inside all custom text inputs.
+
+### 4.6 Native macOS Shortcut Integration (`NotchWindow.swift`)
+- Intercepts Command-key editing shortcuts (`⌘ + C`, `⌘ + V`, `⌘ + A`, `⌘ + X`, `⌘ + Z`, `⇧ + ⌘ + Z`) at the custom borderless window level (`performKeyEquivalent(with:)`).
+- Dispatches standard selector actions (`copy:`, `paste:`, `selectAll:`, `cut:`, `undo:`, `redo:`) directly to the active first responder (`NSTextField` / `NSTextView`), enabling full native editing shortcuts across the application without requiring standard system menu items.
 
 ---
 

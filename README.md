@@ -47,14 +47,45 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
    - Tactile time controls with increment/decrement steppers and direct numeric keyboard entry.
    - Standby Notch Alert HUD featuring an animated swinging bell and time badge on the left wing, and reminder title + amber `[ OK ]` confirmation button on the right wing.
    - Configurable standby alert duration (1, 2, 3, 5, 10 minutes, or until dismissed) and "Require OK to Dismiss" toggle in Settings (`Modules` > `SCHEDULED ALERTS & ALARMS`).
-   - System-wide macOS shortcut integration (`⌘C`, `⌘V`, `⌘A`, `⌘X`, `⌘Z`, `⇧⌘Z`) supported across all text inputs.
 
-8. **System Indicators and Native HUD Replacement**
+8. **Native macOS Shortcut Integration**
+   - Full support for standard macOS editing shortcuts (`⌘ + C`, `⌘ + V`, `⌘ + A`, `⌘ + X`, `⌘ + Z`, `⇧ + ⌘ + Z`) across all text fields and input forms in the application.
+   - Operates seamlessly within the custom floating notch window environment without requiring traditional system menu bar edit items.
+
+9. **System Indicators and Native HUD Replacement**
    - **Native macOS OSD Interception**: Suppresses standard floating pop-up overlays for volume and brightness, rendering them smoothly inside the notch instead.
    - **Smart Audio Output Recognition**: Distinguishes between headphones (earbuds, AirPods, headsets) and speakers (built-in speakers, Bluetooth speakers, external audio) with tailored icons and displays the active device name.
    - **Flicker-Free HUD Slider**: Smooth fluid slider transitions during repeated keystrokes with zero view blinking or notch jitter.
    - **System Telemetry**: Real-time notch badges for battery percentage, charging state, disconnect alerts, and Caps Lock status.
    - **Quick Camera Mirror**: Instant front camera preview toggle directly from the notch.
+
+---
+
+## Release History
+
+### Version 1.1.1 (Latest)
+- **Scheduled Alerts and Routine Alarms**: Dedicated dashboard tab with recurring routines (Daily, Weekdays, Weekends, One-time), tactile time controls, and standby notch alert HUD with animated swinging bell and OK button.
+- **Native macOS Shortcut Integration**: Full support for standard macOS editing shortcuts (`⌘ + C`, `⌘ + V`, `⌘ + A`, `⌘ + X`, `⌘ + Z`, `⇧ + ⌘ + Z`) across all text fields and input forms in the application.
+- **Notification Clipping Fix**: Fixed an issue where collapsing the notch while an incoming alert arrived could clip the notification text. Dynamic wing expansion now expands smoothly up to 280 pt with symmetric morphing.
+- **Alert Page Auto-Collapse**: Fixed cursor focus tracking so the expanded notch reliably auto-collapses when the mouse exits the alert tab according to the configured exit grace period.
+
+### Version 1.1
+- **Native OSD Suppression**: Intercepts keyboard media keys to suppress default macOS volume and brightness pop-up overlays, displaying them directly in the notch.
+- **Smart Audio Output Detection**: Distinguishes between headphones and speakers with dedicated icons, and displays connected Bluetooth device names.
+- **Smooth Notch HUD Animation**: Glides the volume and brightness indicators smoothly without flickering or frame jitter.
+- **Touch ID Fingerprint Animation**: Replaced the padlock icon with a responsive fingerprint glyph and emerald sonar ripple on successful authentication.
+- **Separated Appearance Settings**: Configures Compact Notch and Expanded Dashboard options independently with real-time preview synchronization.
+- **Direct File Drag Interaction**: Dragging files toward the notch automatically switches to the file shelf.
+- **Updated Default Settings**: Inverted horizontal swipe navigation and Launch at Login are now enabled by default.
+
+### Version 1.0
+- **Dynamic Notch Display**: Native Apple Silicon notch integration with configurable standby width and smooth expansion.
+- **Media Player and Synchronized Lyrics**: Playback controls with real-time scrolling lyrics for Spotify, Apple Music, YouTube, and web browsers.
+- **Incoming Notifications and Biometric Privacy**: Displays application notifications with Touch ID lock for sensitive alerts.
+- **File Tray**: Drag-and-drop temporary file shelf for quick staging and sharing.
+- **Download Progress Tracking**: Active download monitoring for Safari, Chrome, Firefox, Arc, and Brave.
+- **Weather and Calendar**: Current temperature, forecasts, and Apple Calendar schedule integration.
+- **System Indicators**: Notch-based indicators for battery level, charging status, volume, brightness, and Caps Lock.
 
 ---
 
