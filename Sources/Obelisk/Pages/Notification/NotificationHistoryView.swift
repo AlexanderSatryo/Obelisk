@@ -11,11 +11,12 @@ public struct NotificationHistoryView: View {
     @ObservedObject var monitor: RealNotificationMonitor = .shared
 
     @State private var hoveredNotificationId: UUID? = nil
+    @State private var isShowingUnlockSuccess: Bool = false
 
     public init() {}
 
     private var isLocked: Bool {
-        settings.requireTouchIDForNotifications && !biometrics.isUnlocked
+        settings.requireTouchIDForNotifications && (!biometrics.isUnlocked || isShowingUnlockSuccess)
     }
 
     private var displayedNotifications: [ObeliskNotification] {
@@ -32,19 +33,43 @@ public struct NotificationHistoryView: View {
         VStack(spacing: 6) {
             if isLocked {
                 lockedPrivacyView
+                    .transition(.asymmetric(
+                        insertion: .opacity,
+                        removal: .opacity.combined(with: .scale(scale: 0.96))
+                    ))
             } else if !settings.enableNotifications {
                 disabledNotificationsView
             } else if displayedNotifications.isEmpty {
                 emptyStateView
             } else {
                 recentFeedView
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.98)),
+                        removal: .opacity
+                    ))
             }
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.82), value: isLocked)
         .frame(height: contentHeight)
         .padding(.top, 2)
         .onAppear {
             RealNotificationMonitor.shared.backfillUnenrichedWhatsAppNotifications()
             autoAuthenticateWithTouchID()
+        }
+        .onChange(of: biometrics.isUnlocked) { unlocked in
+            if unlocked {
+                withAnimation(.spring(response: 0.32, dampingFraction: 0.75)) {
+                    isShowingUnlockSuccess = true
+                }
+                // Allow the user to see the Apple unlock morph animation before sliding into the feed
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.40) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                        isShowingUnlockSuccess = false
+                    }
+                }
+            } else {
+                isShowingUnlockSuccess = false
+            }
         }
         .onChange(of: windowManager.isExpanded) { isExpanded in
             if isExpanded && windowManager.currentTab == .notification {
@@ -73,26 +98,41 @@ public struct NotificationHistoryView: View {
 
     private var lockedPrivacyView: some View {
         VStack(spacing: 7) {
-            ZStack {
-                Circle()
-                    .fill(Color(red: 52/255, green: 199/255, blue: 89/255).opacity(0.12))
-                    .frame(width: 38, height: 38)
-                Image(systemName: "touchid")
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundColor(Color(red: 52/255, green: 199/255, blue: 89/255))
-            }
+            AppleTouchIDGlyphView(
+                isAuthenticating: biometrics.isAuthenticating,
+                isUnlocked: isShowingUnlockSuccess || biometrics.isUnlocked,
+                hasError: biometrics.lastErrorMessage != nil,
+                size: 38
+            )
 
             VStack(spacing: 2) {
-                Text("Touch ID Required")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundColor(.white)
+                if isShowingUnlockSuccess {
+                    HStack(spacing: 5) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(Color(red: 50/255, green: 215/255, blue: 75/255))
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Unlocked")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .transition(.opacity)
 
-                Text("Touch the sensor on your Mac keyboard to unlock notifications.")
-                    .font(.system(size: 10.5, weight: .regular))
-                    .foregroundColor(.white.opacity(0.55))
+                    Text("Opening notifications...")
+                        .font(.system(size: 10.5, weight: .regular))
+                        .foregroundColor(.white.opacity(0.60))
+                        .transition(.opacity)
+                } else {
+                    Text("Touch ID Required")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    Text("Touch the sensor on your Mac keyboard to unlock notifications.")
+                        .font(.system(size: 10.5, weight: .regular))
+                        .foregroundColor(.white.opacity(0.55))
+                }
             }
 
-            if let error = biometrics.lastErrorMessage {
+            if let error = biometrics.lastErrorMessage, !isShowingUnlockSuccess {
                 Text(error)
                     .font(.system(size: 9.5, weight: .medium))
                     .foregroundColor(Color(red: 255/255, green: 69/255, blue: 58/255))
