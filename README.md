@@ -4,7 +4,7 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
 
 ---
 
-## Features
+## Features (v1.1)
 
 1. **Notch Display and Customization**
    - Automatically detects and aligns with native MacBook notch dimensions (and simulates on external displays).
@@ -49,34 +49,12 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
 
 ---
 
-## Release History
-
-### Version 1.1 (Latest)
-- **Native OSD Suppression**: Intercepts keyboard media keys to suppress default macOS volume and brightness pop-up overlays, displaying them directly in the notch.
-- **Smart Audio Output Detection**: Distinguishes between headphones and speakers with dedicated icons, and displays connected Bluetooth device names.
-- **Smooth Notch HUD Animation**: Glides the volume and brightness indicators smoothly without flickering or frame jitter.
-- **Touch ID Fingerprint Animation**: Replaced the padlock icon with a responsive fingerprint glyph and emerald sonar ripple on successful authentication.
-- **Separated Appearance Settings**: Configures Compact Notch and Expanded Dashboard options independently with real-time preview synchronization.
-- **Direct File Drag Interaction**: Dragging files toward the notch automatically switches to the file shelf.
-- **Updated Default Settings**: Inverted horizontal swipe navigation and Launch at Login are now enabled by default.
-
-### Version 1.0
-- **Dynamic Notch Display**: Native Apple Silicon notch integration with configurable standby width and smooth expansion.
-- **Media Player and Synchronized Lyrics**: Playback controls with real-time scrolling lyrics for Spotify, Apple Music, YouTube, and web browsers.
-- **Incoming Notifications and Biometric Privacy**: Displays application notifications with Touch ID lock for sensitive alerts.
-- **File Tray**: Drag-and-drop temporary file shelf for quick staging and sharing.
-- **Download Progress Tracking**: Active download monitoring for Safari, Chrome, Firefox, Arc, and Brave.
-- **Weather and Calendar**: Current temperature, forecasts, and Apple Calendar schedule integration.
-- **System Indicators**: Notch-based indicators for battery level, charging status, volume, brightness, and Caps Lock.
-
----
-
 ## Installation
 
 ### 1. Download .dmg
 Download the latest **`Obelisk.dmg`** installer directly from GitHub Releases:
 
-**[Download Obelisk.dmg (Latest Release)](https://github.com/AlexanderSatryo/Obelisk/releases/latest/download/Obelisk.dmg)**
+**[Download Obelisk.dmg (v1.1)](https://github.com/AlexanderSatryo/Obelisk/releases/latest/download/Obelisk.dmg)**
 
 ### 2. Install to Applications
 1. Double-click the downloaded **`Obelisk.dmg`** file.
