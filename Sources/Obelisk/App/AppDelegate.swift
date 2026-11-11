@@ -385,7 +385,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             HardwareTelemetryService.shared.triggerTransientHUD(
                 .volume(
                     level: 0.72,
-                    isMuted: false
+                    isMuted: false,
+                    deviceName: "Satryo's Buds",
+                    isHeadphones: true
                 ),
                 duration: 4.0
             )

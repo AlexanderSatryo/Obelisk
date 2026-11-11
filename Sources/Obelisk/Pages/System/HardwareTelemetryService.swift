@@ -9,7 +9,7 @@ public enum NotchTransientHUD: Equatable, Hashable {
     case deviceConnected(name: String, iconName: String, statusText: String)
     case deviceDisconnected(name: String, iconName: String, statusText: String)
     case battery(percentage: Int, isCharging: Bool, statusText: String)
-    case volume(level: Double, isMuted: Bool)
+    case volume(level: Double, isMuted: Bool, deviceName: String? = nil, isHeadphones: Bool = false)
     case brightness(level: Double)
     case capsLock(isOn: Bool)
     case download(fileName: String, statusText: String, isSuccess: Bool, progress: Double? = nil)
@@ -92,15 +92,29 @@ public final class HardwareTelemetryService: ObservableObject {
             isSnappy = false
         }
 
-        // Apple signature spring: fluid, organic, slightly bouncy response like native iOS/macOS Dynamic Island
-        let springAnimation: Animation = isSnappy
-            ? .spring(response: 0.32, dampingFraction: 0.74)
-            : .spring(response: 0.36, dampingFraction: 0.82)
+        let isAlreadyActiveHUD: Bool = {
+            guard let current = self.activeTransientHUD else { return false }
+            switch (current, hud) {
+            case (.volume, .volume): return true
+            case (.brightness, .brightness): return true
+            default: return false
+            }
+        }()
 
-        withAnimation(springAnimation) {
+        if isAlreadyActiveHUD {
+            // Already active on screen: update state directly so the slider smoothly glides without notch jitter
             self.activeTransientHUD = hud
-            if !WindowManager.shared.isExpanded {
-                WindowManager.shared.updateCompactWidth(animated: false)
+        } else {
+            // Initial expansion from standby: animate the notch widening smoothly
+            let springAnimation: Animation = isSnappy
+                ? .spring(response: 0.28, dampingFraction: 0.82)
+                : .spring(response: 0.36, dampingFraction: 0.82)
+
+            withAnimation(springAnimation) {
+                self.activeTransientHUD = hud
+                if !WindowManager.shared.isExpanded {
+                    WindowManager.shared.updateCompactWidth(animated: false)
+                }
             }
         }
 

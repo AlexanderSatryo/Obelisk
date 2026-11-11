@@ -496,6 +496,7 @@ public struct ObeliskSettingsDraft: Equatable {
     public var animationSpeed: AnimationSpeedPreset = .balanced
     public var enableHorizontalSwipe: Bool = true
     public var invertHorizontalSwipe: Bool = true
+    public var replaceSystemVolumeHUD: Bool = true
 
     public var enableMediaTab: Bool = true
     public var enableWeatherTab: Bool = true
@@ -595,6 +596,7 @@ public struct ObeliskSettingsDraft: Equatable {
             self.animationSpeed = def.animationSpeed
             self.enableHorizontalSwipe = def.enableHorizontalSwipe
             self.invertHorizontalSwipe = def.invertHorizontalSwipe
+            self.replaceSystemVolumeHUD = def.replaceSystemVolumeHUD
 
         case .modules:
             self.enableMediaTab = def.enableMediaTab
@@ -790,6 +792,14 @@ public final class ObeliskSettings: ObservableObject {
     }
     @Published public var invertHorizontalSwipe: Bool {
         didSet { defaults.set(invertHorizontalSwipe, forKey: "cfg_invertHorizontalSwipe") }
+    }
+    @Published public var replaceSystemVolumeHUD: Bool {
+        didSet {
+            defaults.set(replaceSystemVolumeHUD, forKey: "cfg_replaceSystemVolumeHUD")
+            Task { @MainActor in
+                SystemVolumeAndBrightnessMonitor.shared.updateInterceptionState()
+            }
+        }
     }
 
     // MARK: 3. Modules & Tabs
@@ -999,6 +1009,7 @@ public final class ObeliskSettings: ObservableObject {
         self.animationSpeed = AnimationSpeedPreset(rawValue: defaults.string(forKey: "cfg_animationSpeed") ?? "") ?? .balanced
         self.enableHorizontalSwipe = defaults.object(forKey: "cfg_enableHorizontalSwipe") as? Bool ?? true
         self.invertHorizontalSwipe = defaults.object(forKey: "cfg_invertHorizontalSwipe") as? Bool ?? true
+        self.replaceSystemVolumeHUD = defaults.object(forKey: "cfg_replaceSystemVolumeHUD") as? Bool ?? true
 
         self.enableMediaTab = defaults.object(forKey: "cfg_enableMediaTab") as? Bool ?? true
         self.enableWeatherTab = defaults.object(forKey: "cfg_enableWeatherTab") as? Bool ?? true
@@ -1153,6 +1164,7 @@ public final class ObeliskSettings: ObservableObject {
         animationSpeed = draft.animationSpeed
         enableHorizontalSwipe = draft.enableHorizontalSwipe
         invertHorizontalSwipe = draft.invertHorizontalSwipe
+        replaceSystemVolumeHUD = draft.replaceSystemVolumeHUD
 
         enableMediaTab = draft.enableMediaTab
         enableWeatherTab = draft.enableWeatherTab

@@ -274,7 +274,23 @@ public final class WindowManager: ObservableObject {
                     let wingW = computeBatteryWingWidth(statusText: statusText, percentage: pct, isCharging: isCharging)
                     extraWidth = max(CGFloat(settings.compactWidthOffset), wingW * 2)
                 } else {
-                    let hudExtra: CGFloat = isVolOrBright ? 290 : (isCapsLockHUD ? 240 : 250)
+                    let hudExtra: CGFloat
+                    if isVolOrBright {
+                        if case .volume(_, _, let deviceName, _) = hud, let d = deviceName, !d.isEmpty {
+                            let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+                            let textW = ceil((d as NSString).size(withAttributes: [.font: font]).width)
+                            let leftWingNeeded = 20 + 8 + textW + 22
+                            let rightWingNeeded: CGFloat = 64 + 8 + 36 + 22
+                            let wingW = max(leftWingNeeded, rightWingNeeded)
+                            hudExtra = max(310, wingW * 2)
+                        } else {
+                            hudExtra = 300
+                        }
+                    } else if isCapsLockHUD {
+                        hudExtra = 240
+                    } else {
+                        hudExtra = 250
+                    }
                     extraWidth = max(CGFloat(settings.compactWidthOffset), hudExtra)
                 }
                 targetWidth = baseWidth + extraWidth

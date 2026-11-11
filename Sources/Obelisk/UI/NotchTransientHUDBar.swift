@@ -51,10 +51,12 @@ public struct NotchTransientHUDBar: View {
             if isCharging { return ("bolt.fill", calmSageGreen) }
             if statusText == "Disconnected" || statusText == "Unplugged" { return ("powerplug", calmWarmAmber) }
             return (pct <= 20 ? "battery.25" : "battery.100", pct <= 20 ? calmWarmAmber : calmSageGreen)
-        case .volume(let level, let isMuted):
+        case .volume(let level, let isMuted, _, let isHeadphones):
             let iconName: String
             if isMuted {
                 iconName = "speaker.slash.fill"
+            } else if isHeadphones {
+                iconName = "headphones"
             } else if level <= 0.01 {
                 iconName = "speaker.fill"
             } else if level < 0.33 {
@@ -89,8 +91,17 @@ public struct NotchTransientHUDBar: View {
             if isCharging { return "Charging" }
             if statusText == "Disconnected" || statusText == "Unplugged" { return "Power Disconnected" }
             return pct <= 20 ? "Low Battery" : "Battery"
-        case .volume(_, let isMuted):
-            return isMuted ? "Muted" : "Volume"
+        case .volume(_, let isMuted, let deviceName, _):
+            if isMuted {
+                if let dev = deviceName, !dev.isEmpty {
+                    return "\(dev) (Muted)"
+                }
+                return "Muted"
+            }
+            if let dev = deviceName, !dev.isEmpty {
+                return dev
+            }
+            return "Volume"
         case .brightness:
             return "Brightness"
         case .capsLock:
@@ -111,8 +122,12 @@ public struct NotchTransientHUDBar: View {
             if isCharging { return "Power Adapter Connected" }
             if statusText == "Disconnected" || statusText == "Unplugged" { return "Running on Battery" }
             return statusText
-        case .volume(let level, let isMuted):
-            return isMuted ? "Audio Output Muted" : "\(Int(round(level * 100)))%"
+        case .volume(let level, let isMuted, let deviceName, _):
+            if isMuted { return "Audio Output Muted" }
+            if let dev = deviceName, !dev.isEmpty {
+                return "\(Int(round(level * 100)))% Volume"
+            }
+            return "\(Int(round(level * 100)))%"
         case .brightness(let level):
             return "\(Int(round(level * 100)))%"
         case .capsLock(let isOn):
@@ -197,7 +212,7 @@ public struct NotchTransientHUDBar: View {
                     .frame(width: 76, height: 4)
                 }
             }
-        case .volume(let level, let isMuted):
+        case .volume(let level, let isMuted, _, _):
             VStack(alignment: .trailing, spacing: 5) {
                 Text(isMuted ? "Mute" : "\(Int(round(level * 100)))%")
                     .font(.system(size: 15, weight: .semibold, design: .default))
@@ -324,10 +339,28 @@ public struct NotchTransientHUDBar: View {
     @ViewBuilder
     private func hudLeftWingContent(wingWidth: CGFloat) -> some View {
         switch hud {
-        case .volume(let level, let isMuted):
-            HStack(spacing: 7) {
-                VolumeBadge(level: level, isMuted: isMuted)
-                Text(isMuted ? "Muted" : "Volume")
+        case .volume(let level, let isMuted, let deviceName, let isHeadphones):
+            HStack(spacing: 6) {
+                if isMuted {
+                    Image(systemName: "speaker.slash.fill")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(calmWarmAmber)
+                } else if isHeadphones {
+                    Image(systemName: "headphones")
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundColor(.white)
+                } else {
+                    VolumeBadge(level: level, isMuted: false)
+                }
+
+                let displayName: String = {
+                    if let d = deviceName, !d.isEmpty {
+                        return isMuted ? "\(d) (Muted)" : d
+                    }
+                    return isMuted ? "Muted" : "Volume"
+                }()
+
+                Text(displayName)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
@@ -451,7 +484,7 @@ public struct NotchTransientHUDBar: View {
     @ViewBuilder
     private func hudRightWingContent(wingWidth: CGFloat) -> some View {
         switch hud {
-        case .volume(let level, let isMuted):
+        case .volume(let level, let isMuted, _, _):
             let barW: CGFloat = 64
             HStack(spacing: 8) {
                 ZStack(alignment: .leading) {
@@ -460,8 +493,8 @@ public struct NotchTransientHUDBar: View {
                     Capsule()
                         .fill(isMuted ? calmWarmAmber : Color.white)
                         .frame(width: max(0, min(barW, barW * CGFloat(isMuted ? 0 : level))))
-                        .animation(.interactiveSpring(response: 0.20, dampingFraction: 0.78), value: level)
-                        .animation(.interactiveSpring(response: 0.20, dampingFraction: 0.78), value: isMuted)
+                        .animation(.interactiveSpring(response: 0.16, dampingFraction: 0.88), value: level)
+                        .animation(.interactiveSpring(response: 0.16, dampingFraction: 0.88), value: isMuted)
                 }
                 .frame(width: barW, height: 4)
 
@@ -482,7 +515,7 @@ public struct NotchTransientHUDBar: View {
                     Capsule()
                         .fill(Color(red: 255/255, green: 204/255, blue: 0/255))
                         .frame(width: max(0, min(barW, barW * CGFloat(level))))
-                        .animation(.interactiveSpring(response: 0.20, dampingFraction: 0.78), value: level)
+                        .animation(.interactiveSpring(response: 0.16, dampingFraction: 0.88), value: level)
                 }
                 .frame(width: barW, height: 4)
 

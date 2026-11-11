@@ -218,6 +218,12 @@ public enum SettingsSearchIndex {
             category: .behavior,
             keywords: ["trackpad gestures", "two-finger page swipe", "invert horizontal swipe", "gestures", "trackpad", "swipe"]
         ),
+        SettingsSearchItem(
+            id: "volumeHUD",
+            title: "Replace System Volume & Brightness HUD",
+            category: .behavior,
+            keywords: ["system overlays & hud", "replace system volume & brightness hud", "volume hud", "brightness hud", "osd", "suppress", "satryo's buds", "floating notification", "headphones", "audio device"]
+        ),
 
         // 3. Modules
         SettingsSearchItem(
@@ -1572,6 +1578,20 @@ public struct SettingsView: View {
                             isOn: $draft.invertHorizontalSwipe
                         )
                     }
+                }
+            }
+
+            if isSectionVisible(["volumeHUD", "replaceHUD", "osd", "trigger"]) {
+                PreferenceSection(
+                    title: "SYSTEM OVERLAYS & HUD",
+                    isHighlighted: matchesCurrentQuery("volume") || matchesCurrentQuery("brightness") || matchesCurrentQuery("hud") || matchesCurrentQuery("osd")
+                ) {
+                    PreferenceToggleRow(
+                        title: "Replace System Volume & Brightness HUD",
+                        subtitle: "Suppresses macOS floating OSD popups and displays sleek controls in the notch instead",
+                        isHighlighted: matchesCurrentQuery("volume") || matchesCurrentQuery("brightness") || matchesCurrentQuery("hud"),
+                        isOn: $draft.replaceSystemVolumeHUD
+                    )
                 }
             }
         }

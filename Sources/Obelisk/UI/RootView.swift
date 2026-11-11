@@ -118,13 +118,11 @@ public struct RootView: View {
                     // Transient HUD (earbuds, charging) rendered inside the top notch body
                     if let hud = telemetry.activeTransientHUD {
                         NotchTransientHUDBar(hud: hud, isExpanded: true)
-                            .id(hud)
                             .transition(.opacity)
                     }
                 } else if let hud = telemetry.activeTransientHUD {
                     // Transient HUD (volume, mute, brightness, earbuds, charging) when collapsed in standby
                     NotchTransientHUDBar(hud: hud, isExpanded: false)
-                        .id(hud)
                         .transition(.opacity)
                 } else if let notif = notificationService.activeNotification {
                     // Dynamic Island notification wings / unlocked card when collapsed
