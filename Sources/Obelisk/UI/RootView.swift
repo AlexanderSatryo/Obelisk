@@ -156,45 +156,76 @@ public struct RootView: View {
     }
 
     @ViewBuilder
-    private var notchBackgroundSurface: some View {
-        let shape = NotchShape(bottomRadius: currentRadius, topEarRadius: currentTopEarRadius)
-        ZStack {
-            switch activeSurfaceStyle {
-            case .pitchBlack:
-                Color.black.opacity(surfaceOpacity)
+    private func surfaceBody(for style: NotchSurfaceStyle, isExpandedMode: Bool) -> some View {
+        switch style {
+        case .pitchBlack:
+            Color.black
 
-            case .liquidGlass:
-                NotchLiquidGlassSurface(shape: shape, tint: nil, opacity: surfaceOpacity)
+        case .liquidGlass:
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Color.white.opacity(0.12)
+                LinearGradient(
+                    colors: [Color.white.opacity(0.32), Color.white.opacity(0.08), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
 
-            case .darkGlass:
-                NotchLiquidGlassSurface(shape: shape, tint: Color.black.opacity(0.55), opacity: surfaceOpacity)
+        case .darkGlass:
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Color.black.opacity(0.65)
+                LinearGradient(
+                    colors: [Color.white.opacity(0.18), Color.white.opacity(0.02), Color.clear],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
 
-            case .frostedGlass:
-                ZStack {
-                    Color(red: 13/255, green: 13/255, blue: 16/255).opacity(0.95)
+        case .frostedGlass:
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Color(red: 14/255, green: 14/255, blue: 18/255).opacity(0.92)
+                LinearGradient(
+                    colors: [Color.white.opacity(0.06), Color.clear],
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+            }
+
+        case .ambientGlow:
+            ZStack {
+                Color.black
+                if mediaManager.currentTrack.source != .none {
                     LinearGradient(
-                        colors: [Color.white.opacity(0.05), Color.clear],
+                        colors: [
+                            sourceAccentColor.opacity(isExpandedMode ? 0.20 : 0.10),
+                            Color.clear
+                        ],
                         startPoint: .bottom,
                         endPoint: .top
                     )
                 }
-                .opacity(surfaceOpacity)
+            }
+        }
+    }
 
-            case .ambientGlow:
-                ZStack {
-                    Color.black
-                    if mediaManager.currentTrack.source != .none {
-                        LinearGradient(
-                            colors: [
-                                sourceAccentColor.opacity(windowManager.isExpanded ? 0.16 : 0.10),
-                                Color.clear
-                            ],
-                            startPoint: .bottom,
-                            endPoint: .top
-                        )
-                    }
-                }
-                .opacity(surfaceOpacity)
+    @ViewBuilder
+    private var notchBackgroundSurface: some View {
+        let compactStyle = isNativeBlackStandbyHUD ? .pitchBlack : settings.compactSurfaceStyle
+        let expandedStyle = settings.expandedSurfaceStyle
+
+        ZStack {
+            if compactStyle == expandedStyle {
+                surfaceBody(for: expandedStyle, isExpandedMode: showsExpanded)
+                    .opacity(surfaceOpacity)
+            } else {
+                // Crossfade smoothly between compact and expanded surface materials without pitch black delay
+                surfaceBody(for: compactStyle, isExpandedMode: false)
+                    .opacity(showsExpanded ? 0 : surfaceOpacity)
+                surfaceBody(for: expandedStyle, isExpandedMode: true)
+                    .opacity(showsExpanded ? surfaceOpacity : 0)
             }
 
             if settings.showBorder {
@@ -218,27 +249,21 @@ public struct RootView: View {
 
 // MARK: - Liquid Glass Surface
 
-/// Renders the notch body with Apple's native Liquid Glass material on macOS 26 and later,
-/// and falls back to a system blur material on earlier releases.
+/// Renders the notch body with Apple's ultra thin material blur and specular reflection gradient.
 struct NotchLiquidGlassSurface: View {
     let shape: NotchShape
     let tint: Color?
     let opacity: Double
 
     var body: some View {
-        Group {
-            if #available(macOS 26.0, *) {
-                if let tint {
-                    Color.clear.glassEffect(.regular.tint(tint), in: shape)
-                } else {
-                    Color.clear.glassEffect(.regular, in: shape)
-                }
-            } else {
-                ZStack {
-                    Rectangle().fill(.ultraThinMaterial)
-                    if let tint { tint }
-                }
-            }
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial)
+            if let tint { tint }
+            LinearGradient(
+                colors: [Color.white.opacity(0.20), Color.white.opacity(0.04), Color.clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         }
         .opacity(opacity)
     }
