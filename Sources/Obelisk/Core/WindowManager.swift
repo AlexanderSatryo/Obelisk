@@ -542,7 +542,22 @@ public final class WindowManager: ObservableObject {
                     guard let self = self, !self.isExpanded, !self.isCollapsing else { return }
                     guard ObeliskSettings.shared.triggerMode != .hoverOnly else { return }
                     let notchRect = ScreenGeometry.notchFrame(for: self.currentCompactSize)
-                    if notchRect.contains(NSEvent.mouseLocation) {
+                    let mouseLoc = NSEvent.mouseLocation
+
+                    // If a scheduled alert is active in standby, handle dismissal on right wing click instead of auto-expanding
+                    if case .scheduledAlert = HardwareTelemetryService.shared.activeTransientHUD {
+                        if notchRect.contains(mouseLoc) {
+                            let screen = ScreenGeometry.currentScreen
+                            let midX = screen?.frame.midX ?? (notchRect.origin.x + notchRect.width / 2.0)
+                            let rightWingMinX = midX + (ScreenGeometry.notchSize.width / 2.0) - 8.0
+                            if mouseLoc.x >= rightWingMinX {
+                                ScheduledAlertService.shared.dismissActiveAlert()
+                            }
+                        }
+                        return
+                    }
+
+                    if notchRect.contains(mouseLoc) {
                         self.expand()
                     }
                 }
@@ -687,6 +702,10 @@ public final class WindowManager: ObservableObject {
             // so the user can easily click the [ OK ] button on the standby notch
             if case .scheduledAlert = HardwareTelemetryService.shared.activeTransientHUD {
                 hoverStartTime = nil
+                if !self.isHovered {
+                    self.isHovered = true
+                    NSCursor.pointingHand.set()
+                }
                 return
             }
 

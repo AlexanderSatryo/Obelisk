@@ -278,7 +278,11 @@ public struct NotchTransientHUDBar: View {
                     )
             }
             .buttonStyle(.plain)
+            .contentShape(Rectangle())
             .pointingHandCursor()
+            .onTapGesture {
+                ScheduledAlertService.shared.dismissActiveAlert()
+            }
         }
     }
 
@@ -651,15 +655,20 @@ public struct NotchTransientHUDBar: View {
                     Text("OK")
                         .font(.system(size: 9.5, weight: .bold))
                         .foregroundColor(.black)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2.5)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
                         .background(
                             Capsule().fill(Color(red: 255/255, green: 159/255, blue: 10/255))
                         )
                 }
                 .buttonStyle(.plain)
+                .contentShape(Rectangle())
                 .pointingHandCursor()
+                .onTapGesture {
+                    ScheduledAlertService.shared.dismissActiveAlert()
+                }
             }
+            .contentShape(Rectangle())
         }
     }
 

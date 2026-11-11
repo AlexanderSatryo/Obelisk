@@ -142,6 +142,9 @@ public final class ScheduledAlertService: ObservableObject {
             ? 3600.0
             : max(5.0, TimeInterval(mins * 60))
 
+        // Ensure window receives mouse clicks on the standby notch
+        WindowManager.shared.setIgnoresMouseEvents(false)
+
         // Trigger the notch expansion HUD
         HardwareTelemetryService.shared.triggerTransientHUD(
             .scheduledAlert(title: alert.title, time: alert.time),

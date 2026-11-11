@@ -51,11 +51,15 @@ public final class NotchWindow: NSPanel {
     }
 
     override public var canBecomeKey: Bool {
-        return WindowManager.shared.isExpanded
+        if WindowManager.shared.isExpanded { return true }
+        if case .scheduledAlert = HardwareTelemetryService.shared.activeTransientHUD { return true }
+        return false
     }
 
     override public var canBecomeMain: Bool {
-        return WindowManager.shared.isExpanded
+        if WindowManager.shared.isExpanded { return true }
+        if case .scheduledAlert = HardwareTelemetryService.shared.activeTransientHUD { return true }
+        return false
     }
 
     override public func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -293,6 +297,30 @@ public final class NotchHostingView<Content: View>: NSHostingView<Content> {
         guard !ScreenGeometry.isMissionControlActive() else { return }
         if NotificationService.shared.activeNotification != nil {
             NotificationService.shared.dismissNotification()
+            return
+        }
+        if case .scheduledAlert = HardwareTelemetryService.shared.activeTransientHUD {
+            let loc = event.locationInWindow
+            let wm = WindowManager.shared
+            let visibleSize = wm.isExpanded ? wm.expandedSize : wm.currentCompactSize
+            let notchRect = NSRect(
+                x: bounds.midX - (visibleSize.width / 2.0),
+                y: bounds.maxY - visibleSize.height,
+                width: visibleSize.width,
+                height: visibleSize.height
+            )
+            // If the user clicks the right wing area (where the [ OK ] button lives)
+            let rightWingMinX = bounds.midX + (ScreenGeometry.notchSize.width / 2.0) - 8.0
+            if loc.x >= rightWingMinX && notchRect.contains(loc) {
+                ScheduledAlertService.shared.dismissActiveAlert()
+                return
+            }
+            // If clicked on the left wing / notch body during alert, expand to alert tab
+            if notchRect.contains(loc) && ObeliskSettings.shared.triggerMode != .hoverOnly {
+                WindowManager.shared.expand(openingTab: .alert)
+                return
+            }
+            super.mouseDown(with: event)
             return
         }
         if !WindowManager.shared.isExpanded && ObeliskSettings.shared.triggerMode != .hoverOnly {
