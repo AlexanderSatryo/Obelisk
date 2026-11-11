@@ -4,7 +4,7 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
 
 ---
 
-## Features (v1.1)
+## Features (v1.1.1)
 
 1. **Notch Display and Customization**
    - Automatically detects and aligns with native MacBook notch dimensions (and simulates on external displays).
@@ -40,7 +40,16 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
    - Weather: Real-time temperature, condition indicators, humidity, wind velocity, and hourly forecast.
    - Calendar: Displays upcoming schedule, event timings, and meeting details synced from Apple Calendar.
 
-7. **System Indicators and Native HUD Replacement**
+7. **Scheduled Alerts and Routine Alarms**
+   - Dedicated dashboard tab positioned directly before Notifications with clean Apple-native design.
+   - Configure routine reminders for work attendance, lunch breaks, medication, daily meetings, or custom routines.
+   - Flexible recurrence options: **Daily**, **Weekdays (Mon - Fri)**, **Weekends (Sat - Sun)**, and **One-time**.
+   - Tactile time controls with increment/decrement steppers and direct numeric keyboard entry.
+   - Standby Notch Alert HUD featuring an animated swinging bell and time badge on the left wing, and reminder title + amber `[ OK ]` confirmation button on the right wing.
+   - Configurable standby alert duration (1, 2, 3, 5, 10 minutes, or until dismissed) and "Require OK to Dismiss" toggle in Settings (`Modules` > `SCHEDULED ALERTS & ALARMS`).
+   - System-wide macOS shortcut integration (`⌘C`, `⌘V`, `⌘A`, `⌘X`, `⌘Z`, `⇧⌘Z`) supported across all text inputs.
+
+8. **System Indicators and Native HUD Replacement**
    - **Native macOS OSD Interception**: Suppresses standard floating pop-up overlays for volume and brightness, rendering them smoothly inside the notch instead.
    - **Smart Audio Output Recognition**: Distinguishes between headphones (earbuds, AirPods, headsets) and speakers (built-in speakers, Bluetooth speakers, external audio) with tailored icons and displays the active device name.
    - **Flicker-Free HUD Slider**: Smooth fluid slider transitions during repeated keystrokes with zero view blinking or notch jitter.
@@ -54,7 +63,7 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
 ### 1. Download .dmg
 Download the latest **`Obelisk.dmg`** installer directly from GitHub Releases:
 
-**[Download Obelisk.dmg (v1.1)](https://github.com/AlexanderSatryo/Obelisk/releases/latest/download/Obelisk.dmg)**
+**[Download Obelisk.dmg (v1.1.1)](https://github.com/AlexanderSatryo/Obelisk/releases/latest/download/Obelisk.dmg)**
 
 ### 2. Install to Applications
 1. Double-click the downloaded **`Obelisk.dmg`** file.
@@ -114,8 +123,13 @@ Obelisk/
         │   ├── NotchPageView.swift
         │   ├── NotchTransientHUDBar.swift
         │   ├── IndeterminateProgressBar.swift
+        │   ├── SwingingBellIconView.swift
         │   └── RootView.swift
         ├── Pages/
+        │   ├── Alert/
+        │   │   ├── ScheduledAlertModel.swift
+        │   │   ├── ScheduledAlertService.swift
+        │   │   └── ScheduledAlertsPageView.swift
         │   ├── Media/
         │   │   ├── MediaManager.swift
         │   │   ├── MediaPlayerView.swift

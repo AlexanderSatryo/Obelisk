@@ -10,12 +10,15 @@ public struct NotificationNotchView: View {
     @ObservedObject var settings: ObeliskSettings = .shared
     @ObservedObject var biometrics: BiometricPrivacyService = .shared
 
+    @MainActor
     public static func computeRightWingLabel(
         notification: ObeliskNotification,
-        settings: ObeliskSettings = .shared,
-        isUnlocked: Bool = BiometricPrivacyService.shared.isUnlocked
+        settings: ObeliskSettings? = nil,
+        isUnlocked: Bool? = nil
     ) -> String {
-        if settings.requireTouchIDForNotifications && !isUnlocked {
+        let activeSettings = settings ?? ObeliskSettings.shared
+        let unlocked = isUnlocked ?? BiometricPrivacyService.shared.isUnlocked
+        if activeSettings.requireTouchIDForNotifications && !unlocked {
             return "New Notification"
         }
         let sender = notification.resolvedSenderName

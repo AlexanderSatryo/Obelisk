@@ -13,6 +13,7 @@ flowchart TD
     App --> MM["MediaManager"]
     App --> WS["WeatherService"]
     App --> CS["CalendarService"]
+    App --> SAS["ScheduledAlertService"]
 
     WM --> NW["NotchWindow (Borderless NSPanel)"]
     NW --> RV["RootView (Unified GPU NotchShape)"]
@@ -22,6 +23,7 @@ flowchart TD
     ENV --> MPV["MediaPlayerView + LyricsView"]
     ENV --> DWV["DetailedWeatherView"]
     ENV --> CAV["CalendarAgendaView"]
+    ENV --> SAPV["ScheduledAlertsPageView"]
 
     MM --> MRB["MediaRemoteBridge (/usr/bin/swift Sidecar)"]
     MM --> MAS["MediaArtworkService (Dynamic Artwork & Icons)"]
@@ -100,6 +102,16 @@ flowchart TD
 - Automatically stops `AVCaptureSession` when closed or when the notch collapses so the hardware camera LED turns off immediately.
 - Queries `CoreMediaIO` (`kCMIODevicePropertyDeviceIsRunningSomewhere`) and `CoreAudio` (`kAudioDevicePropertyDeviceIsRunningSomewhere`) to display live Camera and Microphone privacy indicators on both the compact notch wings and the expanded header bar.
 
+### 4.5 Scheduled Alerts & Routine Alarms (`ScheduledAlertService.swift`, `ScheduledAlertsPageView.swift`, `SwingingBellIconView.swift`)
+- **Timer & Persistence Engine**:
+  - Manages alarms persisted in `UserDefaults` (`scheduled_alerts_list_v1`) with recurrence patterns: `Daily`, `Weekdays (Mon - Fri)`, `Weekends (Sat - Sun)`, or `One-time`.
+  - Fires via a lightweight 1-second system timer that compares the current wall-clock minute against stored alert targets.
+- **Standby Notch HUD & Swinging Bell Animation**:
+  - Dispatches `NotchTransientHUD.scheduledAlert` to the compact notch with an animated pendulum-swinging bell glyph (`SwingingBellIconView`) on the left wing and the alert title + amber `[ OK ]` confirmation button on the right wing.
+  - Keeps mouse interaction enabled while in standby alert mode so users can dismiss directly without opening the full dashboard. Auto-expand on hover is temporarily suspended to prevent accidental tab navigation during alarms.
+- **macOS Native Shortcut Integration**:
+  - Intercepts Command-key text manipulation shortcuts (`⌘C`, `⌘V`, `⌘A`, `⌘X`, `⌘Z`, `⇧⌘Z`) at the window key event dispatch level, allowing smooth copy/paste and undo inside all custom text inputs.
+
 ---
 
 ## 5. Comprehensive Settings Reference (`ObeliskSettings.swift` & `SettingsView.swift`)
@@ -139,7 +151,10 @@ All preferences are managed by the `@MainActor` singleton `ObeliskSettings.share
 | `enableMediaTab` | `Bool` | `true` | Shows or hides the Media Player module in the dashboard. |
 | `enableWeatherTab` | `Bool` | `true` | Shows or hides the Weather module in the dashboard. |
 | `enableCalendarTab` | `Bool` | `true` | Shows or hides the Calendar module in the dashboard. |
-| `defaultOpeningTab` | `DefaultOpeningTab` | `.lastUsed` | `.lastUsed`, `.alwaysMedia`, `.alwaysWeather`, or `.alwaysCalendar`. |
+| `enableAlertTab` | `Bool` | `true` | Shows or hides the Scheduled Alerts & Alarms module in the dashboard. |
+| `scheduledAlertDismissMinutes` | `Int` | `5` | Standby alert HUD timeout duration (1, 2, 3, 5, 10 minutes, or 0 for unlimited until dismissed). |
+| `scheduledAlertRequireOK` | `Bool` | `true` | Requires clicking the amber `[ OK ]` button on the notch before the alert can be dismissed. |
+| `defaultOpeningTab` | `DefaultOpeningTab` | `.lastUsed` | `.lastUsed`, `.alwaysMedia`, `.alwaysWeather`, `.alwaysCalendar`, `.alwaysAlert`, or `.alwaysNotification`. |
 
 ### Category 4: Media & Lyrics
 | Setting Property | Type | Default | Description |
