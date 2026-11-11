@@ -187,7 +187,14 @@ public struct ExpandedNotchView: View {
             height: windowManager.expandedSize.height,
             alignment: .top
         )
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+        .onDrop(of: [.fileURL], isTargeted: Binding(
+            get: { false },
+            set: { targeted in
+                if targeted && windowManager.currentTab != .file {
+                    windowManager.switchToTab(.file, updateLastActiveTab: false)
+                }
+            }
+        )) { providers in
             let collector = URLDropCollector()
             let group = DispatchGroup()
             for provider in providers where provider.hasItemConformingToTypeIdentifier("public.file-url") {
@@ -208,6 +215,9 @@ public struct ExpandedNotchView: View {
             group.notify(queue: .main) {
                 let urls = collector.collect()
                 guard !urls.isEmpty else { return }
+                if windowManager.currentTab != .file {
+                    windowManager.switchToTab(.file, updateLastActiveTab: false)
+                }
                 FileTrayService.shared.addFiles(urls: urls)
             }
             return true

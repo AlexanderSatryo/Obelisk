@@ -1,20 +1,20 @@
 import AppKit
 import SwiftUI
 
-/// Apple-grade biometric Touch ID glyph indicator with authentic scanning,
-/// filling, ripple, and morphing unlock animations for the Obelisk notch.
+/// Apple-grade biometric Touch ID glyph indicator for the Obelisk notch.
+/// - Waiting state: Completely still ("diam"), neutral translucent glyph with no distracting pulse loops.
+/// - Unlocked state: The fingerprint itself instantly turns full vibrant Apple green with a spring pop,
+///   glowing backdrop, and expanding sonar ripple ring (replacing the padlock icon).
 public struct AppleTouchIDGlyphView: View {
     public let isAuthenticating: Bool
     public let isUnlocked: Bool
     public let hasError: Bool
     public var size: CGFloat = 40
 
-    @State private var scanSweep: CGFloat = 0.20
-    @State private var breathingScale: CGFloat = 1.0
-    @State private var breathingGlow: Double = 0.12
     @State private var rippleScale: CGFloat = 1.0
     @State private var rippleOpacity: Double = 0.0
     @State private var shakeOffset: CGFloat = 0.0
+    @State private var glyphScale: CGFloat = 1.0
 
     public init(
         isAuthenticating: Bool,
@@ -32,77 +32,65 @@ public struct AppleTouchIDGlyphView: View {
         if hasError {
             return Color(red: 255/255, green: 69/255, blue: 58/255) // Apple Red
         } else if isUnlocked {
-            return Color(red: 50/255, green: 215/255, blue: 75/255) // Bright Apple Emerald
+            return Color(red: 50/255, green: 215/255, blue: 75/255) // Vibrant Apple Emerald
         } else {
-            return Color(red: 52/255, green: 199/255, blue: 89/255) // Classic Apple Green
+            return Color.white.opacity(0.45) // Calm, still neutral outline while waiting
+        }
+    }
+
+    private var circleFillColor: Color {
+        if hasError {
+            return Color(red: 255/255, green: 69/255, blue: 58/255).opacity(0.18)
+        } else if isUnlocked {
+            return Color(red: 50/255, green: 215/255, blue: 75/255).opacity(0.22)
+        } else {
+            return Color.white.opacity(0.08)
+        }
+    }
+
+    private var circleStrokeColor: Color {
+        if hasError {
+            return Color(red: 255/255, green: 69/255, blue: 58/255).opacity(0.40)
+        } else if isUnlocked {
+            return Color(red: 50/255, green: 215/255, blue: 75/255).opacity(0.70)
+        } else {
+            return Color.white.opacity(0.14)
         }
     }
 
     public var body: some View {
         ZStack {
-            // Sonar ripple wave ring radiating outward on success
+            // Sonar ripple wave ring radiating outward on successful Touch ID recognition
             Circle()
-                .stroke(activeColor.opacity(rippleOpacity), lineWidth: 1.8)
+                .stroke(Color(red: 50/255, green: 215/255, blue: 75/255).opacity(rippleOpacity), lineWidth: 1.8)
                 .frame(width: size, height: size)
                 .scaleEffect(rippleScale)
 
-            // Background ambient glow circle
+            // Background badge circle (subtle neutral when waiting, vibrant green glow when unlocked)
             Circle()
-                .fill(activeColor.opacity(breathingGlow))
+                .fill(circleFillColor)
                 .frame(width: size, height: size)
-                .scaleEffect(breathingScale)
                 .overlay(
                     Circle()
-                        .stroke(activeColor.opacity(isUnlocked ? 0.60 : 0.22), lineWidth: 1.0)
+                        .stroke(circleStrokeColor, lineWidth: isUnlocked ? 1.5 : 1.0)
                 )
 
-            // Hollow outline layer (empty fingerprint baseline)
+            // Single Touch ID Fingerprint Glyph:
+            // - Still / neutral when waiting
+            // - Instant full vibrant green with spring pop upon unlock
             Image(systemName: "touchid")
-                .font(.system(size: size * 0.50, weight: .regular))
-                .foregroundColor(Color.white.opacity(0.18))
-                .opacity(isUnlocked ? 0.0 : 1.0)
-
-            // Progressively filling scan layer (animates from bottom to top)
-            if !isUnlocked {
-                Image(systemName: "touchid")
-                    .font(.system(size: size * 0.50, weight: .medium))
-                    .foregroundColor(activeColor)
-                    .mask(
-                        GeometryReader { geo in
-                            VStack(spacing: 0) {
-                                Spacer(minLength: 0)
-                                Rectangle()
-                                    .frame(height: geo.size.height * max(0.10, min(1.0, scanSweep)))
-                            }
-                            .frame(width: geo.size.width, height: geo.size.height)
-                        }
-                    )
-            }
-
-            // Unlocked morphing layer: pad lock open with gentle spring pop
-            if isUnlocked {
-                Image(systemName: "lock.open.fill")
-                    .font(.system(size: size * 0.46, weight: .semibold))
-                    .foregroundColor(activeColor)
-                    .transition(.asymmetric(
-                        insertion: .scale(scale: 0.60).combined(with: .opacity),
-                        removal: .opacity
-                    ))
-            }
+                .font(.system(size: size * 0.52, weight: isUnlocked ? .semibold : .medium))
+                .foregroundColor(activeColor)
+                .scaleEffect(glyphScale)
         }
         .frame(width: size, height: size)
         .offset(x: shakeOffset)
-        .onAppear {
-            startBreathingScanAnimation()
-        }
-        .onChange(of: isAuthenticating) { authenticating in
-            if authenticating {
-                startBreathingScanAnimation()
-            }
-        }
         .onChange(of: isUnlocked) { unlocked in
             if unlocked {
                 triggerUnlockAnimation()
+            } else {
+                glyphScale = 1.0
+                rippleOpacity = 0.0
             }
         }
         .onChange(of: hasError) { error in
@@ -112,31 +100,26 @@ public struct AppleTouchIDGlyphView: View {
         }
     }
 
-    private func startBreathingScanAnimation() {
-        guard !isUnlocked else { return }
-        // Biometric breathing pulse
-        withAnimation(.easeInOut(duration: 1.25).repeatForever(autoreverses: true)) {
-            breathingScale = 1.10
-            breathingGlow = 0.24
-            scanSweep = 0.95
-        }
-    }
-
     private func triggerUnlockAnimation() {
-        // Stop breathing
-        breathingScale = 1.0
-        breathingGlow = 0.30
-        scanSweep = 1.0
+        // Pop the fingerprint glyph slightly for a crisp tactile feel
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.65)) {
+            glyphScale = 1.12
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.80)) {
+                self.glyphScale = 1.0
+            }
+        }
 
         // Sonar ripple expansion
         rippleScale = 1.0
         rippleOpacity = 0.85
-        withAnimation(.easeOut(duration: 0.42)) {
-            rippleScale = 1.70
+        withAnimation(.easeOut(duration: 0.40)) {
+            rippleScale = 1.75
             rippleOpacity = 0.0
         }
 
-        // Haptic feedback
+        // Native Mac haptic feedback
         NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
     }
 
@@ -157,4 +140,3 @@ public struct AppleTouchIDGlyphView: View {
         }
     }
 }
-

@@ -535,10 +535,31 @@ public final class WindowManager: ObservableObject {
         }
     }
 
-    private static var lastConsumedDragChangeCount: Int = NSPasteboard(name: .drag).changeCount
+    private static var lastIdleDragChangeCount: Int = NSPasteboard(name: .drag).changeCount
 
     public static func syncDragPasteboardChangeCount() {
-        lastConsumedDragChangeCount = NSPasteboard(name: .drag).changeCount
+        lastIdleDragChangeCount = NSPasteboard(name: .drag).changeCount
+    }
+
+    public static func hasFileDragOnPasteboard(_ pboard: NSPasteboard) -> Bool {
+        if let types = pboard.types {
+            let matches = types.contains { t in
+                t == .fileURL ||
+                t.rawValue.contains("file-url") ||
+                t.rawValue.contains("NSFilenamesPboardType") ||
+                t.rawValue.contains("public.file-url") ||
+                t.rawValue == "public.item" ||
+                t.rawValue.contains("com.apple.pasteboard.promised-file-url")
+            }
+            if matches { return true }
+        }
+        if let paths = pboard.propertyList(forType: NSPasteboard.PasteboardType("NSFilenamesPboardType")) as? [String], !paths.isEmpty {
+            return true
+        }
+        if let urls = pboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL], urls.contains(where: { $0.isFileURL }) {
+            return true
+        }
+        return false
     }
 
     /// Determines whether the user is actively dragging one or more files/folders in macOS
@@ -553,19 +574,12 @@ public final class WindowManager: ObservableObject {
         let pboard = NSPasteboard(name: .drag)
         let currentCount = pboard.changeCount
 
-        // Only consider it a file drag if a new drag was initiated (changeCount incremented)
-        guard currentCount != lastConsumedDragChangeCount else {
+        // Active drag: changeCount is different from the count recorded when idle
+        guard currentCount != lastIdleDragChangeCount else {
             return false
         }
 
-        // Verify that real file/folder URLs exist on the drag pasteboard
-        guard let urls = pboard.readObjects(forClasses: [NSURL.self], options: [
-            NSPasteboard.ReadingOptionKey.urlReadingFileURLsOnly: true
-        ]) as? [URL], !urls.isEmpty else {
-            return false
-        }
-
-        return true
+        return hasFileDragOnPasteboard(pboard)
     }
 
     /// Evaluates whether the global pointer is within the compact notch interaction threshold.
@@ -589,15 +603,14 @@ public final class WindowManager: ObservableObject {
         // with ZERO dwell latency and activate mouse events on the window.
         if isMouseDown && Self.isSystemDraggingFiles, let screen = ScreenGeometry.currentScreen {
             let screenFrame = screen.frame
-            let approachWidth = max(expandedSize.width * 0.75, 360.0)
+            let approachWidth = max(expandedSize.width * 0.85, 420.0)
             let approachZone = NSRect(
                 x: screenFrame.midX - (approachWidth / 2.0),
-                y: screenFrame.maxY - 75.0,
+                y: screenFrame.maxY - 95.0,
                 width: approachWidth,
-                height: 75.0
+                height: 95.0
             )
             if approachZone.contains(mouseLoc) {
-                Self.syncDragPasteboardChangeCount()
                 hoverStartTime = nil
                 self.window?.ignoresMouseEvents = false
                 self.expand(openingTab: .file)
@@ -663,6 +676,12 @@ public final class WindowManager: ObservableObject {
         // Never collapse while user is holding mouse button down (dragging file, slider, clicking buttons, etc.)
         if isMouseDown {
             outsideTickCount = 0
+            if Self.isSystemDraggingFiles {
+                let expandedZone = ScreenGeometry.expandedHoverFrame(for: expandedSize)
+                if expandedZone.contains(mouseLoc) && currentTab != .file {
+                    switchToTab(.file, updateLastActiveTab: false)
+                }
+            }
             return
         }
 

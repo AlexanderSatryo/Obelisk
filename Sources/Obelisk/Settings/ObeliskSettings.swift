@@ -495,7 +495,7 @@ public struct ObeliskSettingsDraft: Equatable {
     public var exitGraceMs: Double = 180.0
     public var animationSpeed: AnimationSpeedPreset = .balanced
     public var enableHorizontalSwipe: Bool = true
-    public var invertHorizontalSwipe: Bool = false
+    public var invertHorizontalSwipe: Bool = true
 
     public var enableMediaTab: Bool = true
     public var enableWeatherTab: Bool = true
@@ -525,7 +525,7 @@ public struct ObeliskSettingsDraft: Equatable {
     public var manualCityName: String = "South Jakarta"
     public var weatherRefreshMinutes: Int = 1
 
-    public var launchAtLogin: Bool = false
+    public var launchAtLogin: Bool = true
     public var showMenuBarIcon: Bool = true
 
     public init() {}
@@ -998,7 +998,7 @@ public final class ObeliskSettings: ObservableObject {
         self.exitGraceMs = defaults.object(forKey: "cfg_exitGraceMs") as? Double ?? 180.0
         self.animationSpeed = AnimationSpeedPreset(rawValue: defaults.string(forKey: "cfg_animationSpeed") ?? "") ?? .balanced
         self.enableHorizontalSwipe = defaults.object(forKey: "cfg_enableHorizontalSwipe") as? Bool ?? true
-        self.invertHorizontalSwipe = defaults.object(forKey: "cfg_invertHorizontalSwipe") as? Bool ?? false
+        self.invertHorizontalSwipe = defaults.object(forKey: "cfg_invertHorizontalSwipe") as? Bool ?? true
 
         self.enableMediaTab = defaults.object(forKey: "cfg_enableMediaTab") as? Bool ?? true
         self.enableWeatherTab = defaults.object(forKey: "cfg_enableWeatherTab") as? Bool ?? true
@@ -1035,8 +1035,12 @@ public final class ObeliskSettings: ObservableObject {
         self.manualCityName = defaults.string(forKey: "cfg_manualCityName") ?? "South Jakarta"
         self.weatherRefreshMinutes = defaults.object(forKey: "cfg_weatherRefreshMinutes") as? Int ?? 1
 
-        self.launchAtLogin = defaults.object(forKey: "cfg_launchAtLogin") as? Bool ?? false
+        self.launchAtLogin = defaults.object(forKey: "cfg_launchAtLogin") as? Bool ?? true
         self.showMenuBarIcon = defaults.object(forKey: "cfg_showMenuBarIcon") as? Bool ?? true
+
+        if self.launchAtLogin {
+            updateLaunchAtLoginState(true)
+        }
     }
 
     // MARK: - Draft Creation & Explicit Save

@@ -190,14 +190,7 @@ public final class NotchHostingView<Content: View>: NSHostingView<Content> {
 
     public override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
         let pboard = sender.draggingPasteboard
-        let hasFiles = pboard.types?.contains(where: {
-            $0 == .fileURL ||
-            $0.rawValue.contains("file-url") ||
-            $0.rawValue.contains("NSFilenamesPboardType") ||
-            $0.rawValue.contains("public.item")
-        }) == true
-
-        guard hasFiles else { return [] }
+        guard WindowManager.hasFileDragOnPasteboard(pboard) else { return [] }
 
         Task { @MainActor in
             let wm = WindowManager.shared
@@ -212,13 +205,17 @@ public final class NotchHostingView<Content: View>: NSHostingView<Content> {
 
     public override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
         let pboard = sender.draggingPasteboard
-        let hasFiles = pboard.types?.contains(where: {
-            $0 == .fileURL ||
-            $0.rawValue.contains("file-url") ||
-            $0.rawValue.contains("NSFilenamesPboardType") ||
-            $0.rawValue.contains("public.item")
-        }) == true
-        return hasFiles ? .copy : []
+        guard WindowManager.hasFileDragOnPasteboard(pboard) else { return [] }
+
+        Task { @MainActor in
+            let wm = WindowManager.shared
+            if !wm.isExpanded {
+                wm.expand(openingTab: .file)
+            } else if wm.currentTab != .file {
+                wm.switchToTab(.file, updateLastActiveTab: false)
+            }
+        }
+        return .copy
     }
 
     public override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {

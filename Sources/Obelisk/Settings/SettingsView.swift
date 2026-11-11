@@ -77,6 +77,21 @@ public enum SettingsCategory: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Sub-category tabs within the Appearance settings page to cleanly separate Compact and Expanded notch options.
+public enum AppearanceSubMode: String, CaseIterable, Identifiable, Sendable {
+    case compact = "Compact"
+    case expanded = "Expanded"
+
+    public var id: String { rawValue }
+
+    public var icon: String {
+        switch self {
+        case .compact: return "capsule"
+        case .expanded: return "macwindow"
+        }
+    }
+}
+
 /// Structured search index item strictly matching English UI text (sections, rows, subtitles, and options)
 public struct SettingsSearchItem: Identifiable, Sendable {
     public let id: String
@@ -109,7 +124,7 @@ public enum SettingsSearchIndex {
             id: "surface",
             title: "Surface Material",
             category: .appearance,
-            keywords: ["surface & border", "surface", "material", "standby material", "expanded material", "liquid glass", "dark liquid glass", "dark glass", "frosted glass", "pitch black", "ambient glow", "apple glass", "oled"]
+            keywords: ["surface & border", "compact surface", "expanded surface", "compact", "expanded", "surface", "material", "standby material", "expanded material", "liquid glass", "dark liquid glass", "dark glass", "frosted glass", "pitch black", "ambient glow", "apple glass", "oled"]
         ),
         SettingsSearchItem(
             id: "opacity",
@@ -362,6 +377,7 @@ public struct SettingsView: View {
     @State private var searchText: String = ""
     @FocusState private var isSearchFocused: Bool
     @State private var previewExpandedState: Bool = false
+    @State private var appearanceSubMode: AppearanceSubMode = .compact
     @State private var previewTab: ObeliskTab = .media
     @State private var showSavedMessage: Bool = false
     @State private var isPreviewFrozen: Bool = false
@@ -1031,11 +1047,73 @@ public struct SettingsView: View {
     // MARK: - 1. Appearance Tab
 
     private var appearanceTab: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            if searchText.isEmpty {
+                appearanceSubModeSwitcher
+            }
+
+            if searchText.isEmpty {
+                switch appearanceSubMode {
+                case .compact:
+                    compactAppearanceSections
+                case .expanded:
+                    expandedAppearanceSections
+                }
+            } else {
+                // When actively searching, display both Compact and Expanded sections so all query matches are shown
+                compactAppearanceSections
+                expandedAppearanceSections
+            }
+        }
+    }
+
+    // MARK: - Appearance Sub-Mode Switcher
+
+    private var appearanceSubModeSwitcher: some View {
+        HStack(spacing: 8) {
+            ForEach(AppearanceSubMode.allCases) { mode in
+                let isSelected = (appearanceSubMode == mode)
+                Button(action: {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                        appearanceSubMode = mode
+                        previewExpandedState = (mode == .expanded)
+                    }
+                }) {
+                    HStack(spacing: 7) {
+                        Image(systemName: mode.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(mode == .compact ? "Compact Notch" : "Expanded Dashboard")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundColor(isSelected ? .white : .white.opacity(0.55))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(isSelected ? Color.white.opacity(0.14) : Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(isSelected ? Color.white.opacity(0.20) : Color.white.opacity(0.06), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .pointingHandCursor()
+            }
+
+            Spacer()
+        }
+        .padding(.bottom, 2)
+    }
+
+    // MARK: - Compact Appearance Sections
+
+    private var compactAppearanceSections: some View {
         VStack(alignment: .leading, spacing: 22) {
-            // Surface & Border
+            // Surface & Border (Compact Standby)
             if isSectionVisible(["surface", "opacity", "border"]) {
                 PreferenceSection(
-                    title: "SURFACE & BORDER",
+                    title: "COMPACT SURFACE & BORDER",
                     isHighlighted: matchesCurrentQuery("surface") || matchesCurrentQuery("opacity") || matchesCurrentQuery("border")
                 ) {
                     PreferenceRow(
@@ -1045,17 +1123,6 @@ public struct SettingsView: View {
                     ) {
                         ModernMenuPicker(
                             selection: $draft.compactSurfaceStyle,
-                            options: NotchSurfaceStyle.allCases.map { ($0, $0.title) }
-                        )
-                    }
-
-                    PreferenceRow(
-                        title: "Expanded Material",
-                        subtitle: draft.expandedSurfaceStyle.subtitle,
-                        isHighlighted: matchesCurrentQuery("surface")
-                    ) {
-                        ModernMenuPicker(
-                            selection: $draft.expandedSurfaceStyle,
                             options: NotchSurfaceStyle.allCases.map { ($0, $0.title) }
                         )
                     }
@@ -1093,40 +1160,15 @@ public struct SettingsView: View {
                 }
             }
 
-            // Color Theme & Brightness
-            if isSectionVisible(["theme"]) {
-                PreferenceSection(
-                    title: "COLOR THEME & BRIGHTNESS",
-                    isHighlighted: matchesCurrentQuery("theme")
-                ) {
-                    PreferenceRow(
-                        title: "Color Preset",
-                        subtitle: draft.colorTheme.subtitle,
-                        isHighlighted: matchesCurrentQuery("theme")
-                    ) {
-                        ModernMenuPicker(
-                            selection: $draft.colorTheme,
-                            options: NotchColorTheme.allCases.map { ($0, $0.title) }
-                        )
-                    }
-
-                    PreferenceSliderRow(
-                        title: "Brightness",
-                        isHighlighted: matchesCurrentQuery("theme"),
-                        value: $draft.colorBrightness,
-                        range: 0.5...1.5
-                    )
-                }
-            }
-
-            // Geometry & Dimensions
+            // Compact Geometry & Dimensions
             if isSectionVisible(["geometry", "topCornerRadius", "bottomCornerRadius"]) {
                 PreferenceSection(
-                    title: "GEOMETRY",
+                    title: "COMPACT GEOMETRY",
                     isHighlighted: matchesCurrentQuery("geometry") || matchesCurrentQuery("topCornerRadius") || matchesCurrentQuery("bottomCornerRadius")
                 ) {
                     PreferenceSliderRow(
                         title: "Compact Width Offset",
+                        subtitle: "Horizontal width clearance for the compact standby notch (40 - 380 pt)",
                         isHighlighted: matchesCurrentQuery("geometry"),
                         value: $draft.compactWidthOffset,
                         range: 40...380
@@ -1134,104 +1176,31 @@ public struct SettingsView: View {
 
                     PreferenceSliderRow(
                         title: "Compact Height Offset",
+                        subtitle: "Vertical height adjustment relative to camera bezel (-4 to +24 pt)",
                         isHighlighted: matchesCurrentQuery("geometry"),
                         value: $draft.compactHeightOffset,
                         range: -4...24
                     )
 
-                    PreferenceRow(
-                        title: "Expanded Width Preset",
-                        subtitle: "Quick size profile for the expanded notch",
-                        isHighlighted: matchesCurrentQuery("geometry")
-                    ) {
-                        ModernMenuPicker(
-                            selection: Binding(
-                                get: {
-                                    if draft.expandedWidthPreset == .custom {
-                                        return .custom
-                                    }
-                                    if abs(draft.expandedWidth - ExpandedWidthPreset.compact.width) < 1.0 {
-                                        return .compact
-                                    } else if abs(draft.expandedWidth - ExpandedWidthPreset.standard.width) < 1.0 {
-                                        return .standard
-                                    } else if abs(draft.expandedWidth - ExpandedWidthPreset.wide.width) < 1.0 {
-                                        return .wide
-                                    } else {
-                                        return .custom
-                                    }
-                                },
-                                set: { newPreset in
-                                    draft.expandedWidthPreset = newPreset
-                                    if newPreset != .custom {
-                                        draft.expandedWidth = Double(newPreset.width)
-                                    }
-                                }
-                            ),
-                            options: ExpandedWidthPreset.allCases.map { ($0, $0.title) }
-                        )
-                    }
-
-                    PreferenceSliderRow(
-                        title: "Expanded Width",
-                        subtitle: "Custom width in points for expanded dashboard (560 - 760 pt)",
-                        isHighlighted: matchesCurrentQuery("geometry"),
-                        value: Binding(
-                            get: { draft.expandedWidth },
-                            set: { newVal in
-                                draft.expandedWidth = newVal
-                                if abs(newVal - ExpandedWidthPreset.compact.width) < 1.0 {
-                                    draft.expandedWidthPreset = .compact
-                                } else if abs(newVal - ExpandedWidthPreset.standard.width) < 1.0 {
-                                    draft.expandedWidthPreset = .standard
-                                } else if abs(newVal - ExpandedWidthPreset.wide.width) < 1.0 {
-                                    draft.expandedWidthPreset = .wide
-                                } else {
-                                    draft.expandedWidthPreset = .custom
-                                }
-                            }
-                        ),
-                        range: 560...760
-                    )
-
-                    PreferenceSliderRow(
-                        title: "Expanded Height Offset",
-                        subtitle: "Fine-tune vertical height of expanded cards and dashboard pages (-24 to +100 pt)",
-                        isHighlighted: matchesCurrentQuery("geometry"),
-                        value: $draft.expandedHeightOffset,
-                        range: -24...100
-                    )
-
                     PreferenceSliderRow(
                         title: "Compact Top Radius (Bezel)",
+                        subtitle: "Curvature at the top corners meeting the display bezel (0 - 16 pt)",
                         isHighlighted: matchesCurrentQuery("topCornerRadius"),
                         value: $draft.compactTopCornerRadius,
                         range: 0...16
                     )
 
                     PreferenceSliderRow(
-                        title: "Expanded Top Radius (Bezel)",
-                        isHighlighted: matchesCurrentQuery("topCornerRadius"),
-                        value: $draft.expandedTopCornerRadius,
-                        range: 0...20
-                    )
-
-                    PreferenceSliderRow(
                         title: "Compact Bottom Radius",
+                        subtitle: "Curvature at the bottom corners of the standby notch (8 - 18 pt)",
                         isHighlighted: matchesCurrentQuery("bottomCornerRadius") || matchesCurrentQuery("geometry"),
                         value: $draft.compactCornerRadius,
                         range: 8...18
                     )
-
-                    PreferenceSliderRow(
-                        title: "Expanded Bottom Radius",
-                        isHighlighted: matchesCurrentQuery("bottomCornerRadius") || matchesCurrentQuery("geometry"),
-                        value: $draft.expandedCornerRadius,
-                        range: 12...26
-                    )
                 }
             }
 
-            // Wings & Waveform
+            // Compact Wings & Telemetry
             if isSectionVisible(["compactWings", "leftWing", "rightWing", "waveformColor", "timerColor"]) {
                 PreferenceSection(
                     title: "COMPACT WINGS",
@@ -1323,6 +1292,200 @@ public struct SettingsView: View {
                         subtitle: "Notify on the notch when battery reaches 100% while connected to power",
                         isHighlighted: matchesCurrentQuery("standbyHUD"),
                         isOn: $draft.notifyBatteryFullyCharged
+                    )
+                }
+            }
+
+            // Color Theme & Brightness
+            if isSectionVisible(["theme"]) {
+                PreferenceSection(
+                    title: "COLOR THEME & BRIGHTNESS",
+                    isHighlighted: matchesCurrentQuery("theme")
+                ) {
+                    PreferenceRow(
+                        title: "Color Preset",
+                        subtitle: draft.colorTheme.subtitle,
+                        isHighlighted: matchesCurrentQuery("theme")
+                    ) {
+                        ModernMenuPicker(
+                            selection: $draft.colorTheme,
+                            options: NotchColorTheme.allCases.map { ($0, $0.title) }
+                        )
+                    }
+
+                    PreferenceSliderRow(
+                        title: "Brightness",
+                        isHighlighted: matchesCurrentQuery("theme"),
+                        value: $draft.colorBrightness,
+                        range: 0.5...1.5
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Expanded Appearance Sections
+
+    private var expandedAppearanceSections: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            // Surface & Border (Expanded Dashboard)
+            if isSectionVisible(["surface", "opacity", "border"]) {
+                PreferenceSection(
+                    title: "EXPANDED SURFACE & BORDER",
+                    isHighlighted: matchesCurrentQuery("surface") || matchesCurrentQuery("opacity") || matchesCurrentQuery("border")
+                ) {
+                    PreferenceRow(
+                        title: "Expanded Material",
+                        subtitle: draft.expandedSurfaceStyle.subtitle,
+                        isHighlighted: matchesCurrentQuery("surface")
+                    ) {
+                        ModernMenuPicker(
+                            selection: $draft.expandedSurfaceStyle,
+                            options: NotchSurfaceStyle.allCases.map { ($0, $0.title) }
+                        )
+                    }
+
+                    PreferenceSliderRow(
+                        title: "Notch Opacity",
+                        isHighlighted: matchesCurrentQuery("opacity"),
+                        value: $draft.notchOpacity,
+                        range: 0.20...1.00
+                    )
+
+                    PreferenceToggleRow(
+                        title: "Hairline Rim Border",
+                        subtitle: "Draws a crisp edge stroke along the bottom curvature",
+                        isHighlighted: matchesCurrentQuery("border"),
+                        isOn: $draft.showBorder
+                    )
+
+                    if draft.showBorder {
+                        PreferenceSliderRow(
+                            title: "Border Width",
+                            isHighlighted: matchesCurrentQuery("border"),
+                            value: $draft.borderWidth,
+                            range: 0.5...2.0
+                        )
+
+                        PreferenceSliderRow(
+                            title: "Border Opacity",
+                            subtitle: "Adjusts outline stroke opacity around notch edge (useful if faint on external monitors)",
+                            isHighlighted: matchesCurrentQuery("border"),
+                            value: $draft.borderOpacity,
+                            range: 0.04...0.40
+                        )
+                    }
+                }
+            }
+
+            // Expanded Geometry & Dimensions
+            if isSectionVisible(["geometry", "topCornerRadius", "bottomCornerRadius"]) {
+                PreferenceSection(
+                    title: "EXPANDED GEOMETRY",
+                    isHighlighted: matchesCurrentQuery("geometry") || matchesCurrentQuery("topCornerRadius") || matchesCurrentQuery("bottomCornerRadius")
+                ) {
+                    PreferenceRow(
+                        title: "Expanded Width Preset",
+                        subtitle: "Quick size profile for the expanded dashboard",
+                        isHighlighted: matchesCurrentQuery("geometry")
+                    ) {
+                        ModernMenuPicker(
+                            selection: Binding(
+                                get: {
+                                    if draft.expandedWidthPreset == .custom {
+                                        return .custom
+                                    }
+                                    if abs(draft.expandedWidth - ExpandedWidthPreset.compact.width) < 1.0 {
+                                        return .compact
+                                    } else if abs(draft.expandedWidth - ExpandedWidthPreset.standard.width) < 1.0 {
+                                        return .standard
+                                    } else if abs(draft.expandedWidth - ExpandedWidthPreset.wide.width) < 1.0 {
+                                        return .wide
+                                    } else {
+                                        return .custom
+                                    }
+                                },
+                                set: { newPreset in
+                                    draft.expandedWidthPreset = newPreset
+                                    if newPreset != .custom {
+                                        draft.expandedWidth = Double(newPreset.width)
+                                    }
+                                }
+                            ),
+                            options: ExpandedWidthPreset.allCases.map { ($0, $0.title) }
+                        )
+                    }
+
+                    PreferenceSliderRow(
+                        title: "Expanded Width",
+                        subtitle: "Custom width in points for expanded dashboard (560 - 760 pt)",
+                        isHighlighted: matchesCurrentQuery("geometry"),
+                        value: Binding(
+                            get: { draft.expandedWidth },
+                            set: { newVal in
+                                draft.expandedWidth = newVal
+                                if abs(newVal - ExpandedWidthPreset.compact.width) < 1.0 {
+                                    draft.expandedWidthPreset = .compact
+                                } else if abs(newVal - ExpandedWidthPreset.standard.width) < 1.0 {
+                                    draft.expandedWidthPreset = .standard
+                                } else if abs(newVal - ExpandedWidthPreset.wide.width) < 1.0 {
+                                    draft.expandedWidthPreset = .wide
+                                } else {
+                                    draft.expandedWidthPreset = .custom
+                                }
+                            }
+                        ),
+                        range: 560...760
+                    )
+
+                    PreferenceSliderRow(
+                        title: "Expanded Height Offset",
+                        subtitle: "Fine-tune vertical height of expanded cards and dashboard pages (-24 to +100 pt)",
+                        isHighlighted: matchesCurrentQuery("geometry"),
+                        value: $draft.expandedHeightOffset,
+                        range: -24...100
+                    )
+
+                    PreferenceSliderRow(
+                        title: "Expanded Top Radius (Bezel)",
+                        subtitle: "Curvature at the top corners meeting the display bezel when expanded (0 - 20 pt)",
+                        isHighlighted: matchesCurrentQuery("topCornerRadius"),
+                        value: $draft.expandedTopCornerRadius,
+                        range: 0...20
+                    )
+
+                    PreferenceSliderRow(
+                        title: "Expanded Bottom Radius",
+                        subtitle: "Curvature at the bottom corners of the expanded dashboard (12 - 26 pt)",
+                        isHighlighted: matchesCurrentQuery("bottomCornerRadius") || matchesCurrentQuery("geometry"),
+                        value: $draft.expandedCornerRadius,
+                        range: 12...26
+                    )
+                }
+            }
+
+            // Color Theme & Brightness
+            if isSectionVisible(["theme"]) {
+                PreferenceSection(
+                    title: "COLOR THEME & BRIGHTNESS",
+                    isHighlighted: matchesCurrentQuery("theme")
+                ) {
+                    PreferenceRow(
+                        title: "Color Preset",
+                        subtitle: draft.colorTheme.subtitle,
+                        isHighlighted: matchesCurrentQuery("theme")
+                    ) {
+                        ModernMenuPicker(
+                            selection: $draft.colorTheme,
+                            options: NotchColorTheme.allCases.map { ($0, $0.title) }
+                        )
+                    }
+
+                    PreferenceSliderRow(
+                        title: "Brightness",
+                        isHighlighted: matchesCurrentQuery("theme"),
+                        value: $draft.colorBrightness,
+                        range: 0.5...1.5
                     )
                 }
             }
@@ -1896,7 +2059,15 @@ public struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
 
-                Picker("", selection: $previewExpandedState) {
+                Picker("", selection: Binding(
+                    get: { previewExpandedState },
+                    set: { isExp in
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                            previewExpandedState = isExp
+                            appearanceSubMode = isExp ? .expanded : .compact
+                        }
+                    }
+                )) {
                     Text("Compact").tag(false)
                     Text("Expanded").tag(true)
                 }
