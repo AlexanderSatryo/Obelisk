@@ -447,16 +447,18 @@ public struct SettingsView: View {
 
     public var body: some View {
         HStack(spacing: 0) {
-            // MARK: - Left macOS System Settings Sidebar
+            // MARK: - Left macOS System Settings Sidebar (strictly locked 236pt width)
             sidebarView
                 .frame(width: 236)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .fixedSize(horizontal: true, vertical: false)
                 .background(Color(red: 22/255, green: 22/255, blue: 25/255))
 
             Rectangle()
                 .fill(Color.white.opacity(0.07))
                 .frame(width: 1)
 
-            // MARK: - Right Detail Content Area
+            // MARK: - Right Detail Content Area (strictly locked 663pt width to match 900x640 window)
             VStack(spacing: 0) {
                 // macOS Category or Search Header
                 if searchText.isEmpty {
@@ -510,6 +512,7 @@ public struct SettingsView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 18)
                     .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Rectangle()
@@ -519,10 +522,11 @@ public struct SettingsView: View {
                 // Bottom Action Footer
                 detailFooterView
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(width: 663, height: 640, alignment: .top)
+            .clipped()
             .background(Color(red: 16/255, green: 16/255, blue: 18/255))
         }
-        .frame(width: 840, height: 620)
+        .frame(width: 900, height: 640)
         .background(Color(red: 16/255, green: 16/255, blue: 18/255))
         .preferredColorScheme(.dark)
         .confirmationDialog(
@@ -787,14 +791,26 @@ public struct SettingsView: View {
 
             Spacer()
 
-            ModernButton(
-                title: "Reset to Defaults",
-                icon: "arrow.counterclockwise"
-            ) {
+            Button(action: {
                 withAnimation(.easeInOut(duration: 0.15)) {
                     draft.resetCategoryToDefaults(selectedCategory)
                 }
+            }) {
+                Text("Reset to Defaults")
+                    .font(.system(size: 11.5, weight: .regular))
+                    .foregroundColor(.white.opacity(0.60))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+                    )
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Reset \(selectedCategory.rawValue) to Defaults")
         }
         .padding(.horizontal, 24)
@@ -816,45 +832,60 @@ public struct SettingsView: View {
                         .foregroundColor(.white.opacity(0.90))
                 }
             } else if hasUnsavedChanges {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color(red: 255/255, green: 175/255, blue: 60/255))
-                        .frame(width: 7, height: 7)
-                    Text("Previewing changes in canvas above")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.85))
-                }
+                Text("Unsaved changes")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(.white.opacity(0.60))
             } else {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color(red: 0.20, green: 0.78, blue: 0.45))
-                        .frame(width: 7, height: 7)
-                    Text("All settings in sync with notch")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.70))
-                }
+                Text("All settings in sync with notch")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(.white.opacity(0.50))
             }
 
             Spacer()
 
             if hasUnsavedChanges {
-                ModernButton(title: "Discard", icon: "xmark") {
+                Button(action: {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         draft = savedSnapshot
                         hasUnsavedChanges = false
                     }
+                }) {
+                    Text("Discard")
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(.white.opacity(0.85))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                        )
                 }
+                .buttonStyle(.plain)
             }
 
-            ModernButton(
-                title: "Save Changes",
-                icon: "checkmark",
-                isProminent: true
-            ) {
+            Button(action: {
                 saveSettings()
+            }) {
+                Text("Save Changes")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 4.5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                            .fill(Color.blue.opacity(hasUnsavedChanges ? 0.92 : 0.35))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                            .stroke(Color.blue.opacity(hasUnsavedChanges ? 0.35 : 0.08), lineWidth: 0.5)
+                    )
             }
+            .buttonStyle(.plain)
             .disabled(!hasUnsavedChanges && !showSavedMessage)
-            .opacity(!hasUnsavedChanges && !showSavedMessage ? 0.45 : 1.0)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 12)
@@ -1062,10 +1093,6 @@ public struct SettingsView: View {
     private var appearanceTab: some View {
         VStack(alignment: .leading, spacing: 18) {
             if searchText.isEmpty {
-                appearanceSubModeSwitcher
-            }
-
-            if searchText.isEmpty {
                 switch appearanceSubMode {
                 case .compact:
                     compactAppearanceSections
@@ -1078,45 +1105,6 @@ public struct SettingsView: View {
                 expandedAppearanceSections
             }
         }
-    }
-
-    // MARK: - Appearance Sub-Mode Switcher
-
-    private var appearanceSubModeSwitcher: some View {
-        HStack(spacing: 8) {
-            ForEach(AppearanceSubMode.allCases) { mode in
-                let isSelected = (appearanceSubMode == mode)
-                Button(action: {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                        appearanceSubMode = mode
-                        previewExpandedState = (mode == .expanded)
-                    }
-                }) {
-                    HStack(spacing: 7) {
-                        Image(systemName: mode.icon)
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(mode == .compact ? "Compact Notch" : "Expanded Dashboard")
-                            .font(.system(size: 12, weight: .semibold))
-                    }
-                    .foregroundColor(isSelected ? .white : .white.opacity(0.55))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(isSelected ? Color.white.opacity(0.14) : Color.white.opacity(0.04))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(isSelected ? Color.white.opacity(0.20) : Color.white.opacity(0.06), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .pointingHandCursor()
-            }
-
-            Spacer()
-        }
-        .padding(.bottom, 2)
     }
 
     // MARK: - Compact Appearance Sections
@@ -1140,11 +1128,22 @@ public struct SettingsView: View {
                         )
                     }
 
+                    if draft.compactSurfaceStyle.isLiquidGlass {
+                        PreferenceSliderRow(
+                            title: "Glass Blur Density",
+                            subtitle: "Adjusts background optical blur and frosted dispersion",
+                            isHighlighted: matchesCurrentQuery("blur"),
+                            value: $draft.compactGlassBlur,
+                            range: 0.10...1.00
+                        )
+                    }
+
                     PreferenceSliderRow(
-                        title: "Notch Opacity",
+                        title: "Standby Opacity",
+                        subtitle: "Adjusts translucency and body darkness of the standby notch",
                         isHighlighted: matchesCurrentQuery("opacity"),
-                        value: $draft.notchOpacity,
-                        range: 0.20...1.00
+                        value: $draft.compactOpacity,
+                        range: 0.15...1.00
                     )
 
                     PreferenceToggleRow(
@@ -1358,11 +1357,22 @@ public struct SettingsView: View {
                         )
                     }
 
+                    if draft.expandedSurfaceStyle.isLiquidGlass {
+                        PreferenceSliderRow(
+                            title: "Glass Blur Density",
+                            subtitle: "Adjusts background optical blur and frosted dispersion",
+                            isHighlighted: matchesCurrentQuery("blur"),
+                            value: $draft.expandedGlassBlur,
+                            range: 0.10...1.00
+                        )
+                    }
+
                     PreferenceSliderRow(
-                        title: "Notch Opacity",
+                        title: "Expanded Opacity",
+                        subtitle: "Adjusts translucency and body darkness of the expanded notch",
                         isHighlighted: matchesCurrentQuery("opacity"),
-                        value: $draft.notchOpacity,
-                        range: 0.20...1.00
+                        value: $draft.expandedOpacity,
+                        range: 0.15...1.00
                     )
 
                     PreferenceToggleRow(
@@ -2033,13 +2043,22 @@ public struct SettingsView: View {
 
                     Spacer()
 
-                    ModernButton(
-                        title: "Reset All",
-                        icon: "arrow.counterclockwise.circle",
-                        isDestructive: true
-                    ) {
+                    Button("Reset All...") {
                         showingResetConfirmation = true
                     }
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(.white.opacity(0.85))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 4.5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                    )
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 11)
@@ -2072,13 +2091,22 @@ public struct SettingsView: View {
 
                     Spacer()
 
-                    ModernButton(
-                        title: "Quit",
-                        icon: "power",
-                        isDestructive: true
-                    ) {
+                    Button("Quit Obelisk") {
                         NSApp.terminate(nil)
                     }
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(.white.opacity(0.85))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 4.5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                    )
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 11)
@@ -2104,57 +2132,93 @@ public struct SettingsView: View {
                         .foregroundColor(.white.opacity(0.50))
                     Text("LIVE NOTCH PREVIEW")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.50))
+                        .foregroundColor(.white.opacity(0.55))
                         .tracking(0.6)
                 }
 
                 Spacer()
 
-                Button(action: {
-                    if isPreviewFrozen {
-                        isPreviewFrozen = false
-                        frozenDraft = nil
-                    } else {
-                        frozenDraft = draft
-                        isPreviewFrozen = true
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: isPreviewFrozen ? "lock.fill" : "lock.open")
-                            .font(.system(size: 8.5))
-                        Text(isPreviewFrozen ? "Frozen" : "Live")
-                            .font(.system(size: 9.5, weight: .medium))
-                    }
-                    .foregroundColor(isPreviewFrozen ? .white : .white.opacity(0.65))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3.5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(isPreviewFrozen ? Color.white.opacity(0.18) : Color.white.opacity(0.06))
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Picker("", selection: Binding(
-                    get: { previewExpandedState },
-                    set: { isExp in
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                            previewExpandedState = isExp
-                            appearanceSubMode = isExp ? .expanded : .compact
+                HStack(spacing: 8) {
+                    HStack(spacing: 0) {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                previewExpandedState = false
+                                appearanceSubMode = .compact
+                            }
+                        }) {
+                            Text("Compact")
+                                .font(.system(size: 11, weight: !previewExpandedState ? .medium : .regular))
+                                .foregroundColor(!previewExpandedState ? .white : .white.opacity(0.60))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 3.5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .fill(!previewExpandedState ? Color.white.opacity(0.18) : Color.clear)
+                                )
                         }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                previewExpandedState = true
+                                appearanceSubMode = .expanded
+                            }
+                        }) {
+                            Text("Expanded")
+                                .font(.system(size: 11, weight: previewExpandedState ? .medium : .regular))
+                                .foregroundColor(previewExpandedState ? .white : .white.opacity(0.60))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 3.5)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .fill(previewExpandedState ? Color.white.opacity(0.18) : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
-                )) {
-                    Text("Compact").tag(false)
-                    Text("Expanded").tag(true)
+                    .padding(2)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Color.white.opacity(0.09), lineWidth: 0.5)
+                    )
+
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            if isPreviewFrozen {
+                                isPreviewFrozen = false
+                                frozenDraft = nil
+                            } else {
+                                frozenDraft = draft
+                                isPreviewFrozen = true
+                            }
+                        }
+                    }) {
+                        HStack(spacing: 5) {
+                            Text(isPreviewFrozen ? "Paused" : "Live")
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundColor(isPreviewFrozen ? .white.opacity(0.50) : .white)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(isPreviewFrozen ? Color.white.opacity(0.06) : Color.blue.opacity(0.15))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .stroke(isPreviewFrozen ? Color.white.opacity(0.08) : Color.blue.opacity(0.25), lineWidth: 0.5)
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 140)
             }
 
             if previewExpandedState {
                 HStack(spacing: 6) {
-                    Text("Preview Tab:")
-                        .font(.system(size: 10, weight: .medium))
+                    Text("Tab:")
+                        .font(.system(size: 10.5, weight: .medium))
                         .foregroundColor(.white.opacity(0.40))
 
                     ForEach(activeDraft.enabledTabs, id: \.rawValue) { tab in
@@ -2166,9 +2230,7 @@ public struct SettingsView: View {
                                 Image(systemName: tab.icon)
                                     .font(.system(size: 8.5))
                                 Text(tab.title)
-                                    .font(.system(size: 10, weight: isCurrentTab ? .semibold : .regular))
-                                    .lineLimit(1)
-                                    .fixedSize(horizontal: true, vertical: false)
+                                    .font(.system(size: 10.5, weight: isCurrentTab ? .semibold : .regular))
                             }
                             .foregroundColor(isCurrentTab ? .white : .white.opacity(0.60))
                             .padding(.horizontal, 8)
@@ -2197,38 +2259,45 @@ public struct SettingsView: View {
         return VStack(alignment: .leading, spacing: 8) {
             previewControlBar
 
-            let compactPreviewW: CGFloat = CGFloat(110.0 + activeDraft.compactWidthOffset * 0.70)
-            let compactPreviewH: CGFloat = max(24, CGFloat(28.0 + activeDraft.compactHeightOffset * 0.85))
-            let expandedPreviewW: CGFloat = CGFloat(activeDraft.expandedWidth * 0.52)
-            let expandedPreviewH: CGFloat = max(90, CGFloat(112.0 + activeDraft.expandedHeightOffset * 0.55))
+            let compactPreviewW: CGFloat = CGFloat(max(190.0, 210.0 + activeDraft.compactWidthOffset * 0.65))
+            let compactPreviewH: CGFloat = max(28, CGFloat(32.0 + activeDraft.compactHeightOffset * 0.80))
+            // Smoothly map Expanded Width (560...760 pt) across the Bezel Simulator canvas (435...585 pt) so changes are 100% visible in real time
+            let clampedExpW = min(760.0, max(560.0, activeDraft.expandedWidth))
+            let expandedPreviewW: CGFloat = CGFloat(435.0 + ((clampedExpW - 560.0) / 200.0) * 150.0)
+            let expandedPreviewH: CGFloat = max(165, CGFloat(168.0 + activeDraft.expandedHeightOffset))
 
             let pWidth: CGFloat = previewExpandedState ? expandedPreviewW : compactPreviewW
             let pHeight: CGFloat = previewExpandedState ? expandedPreviewH : compactPreviewH
-            let pWingSlot: CGFloat = max(22, CGFloat(activeDraft.compactWidthOffset * 0.40))
+            let pWingSlot: CGFloat = max(60, (pWidth - 44) / 2)
             let pRadius: CGFloat = previewExpandedState
-                ? CGFloat(activeDraft.expandedCornerRadius * 0.8)
-                : CGFloat(activeDraft.compactCornerRadius * 0.8)
-            let pTopEarRadius: CGFloat = previewExpandedState ? 10.0 : 8.0
+                ? CGFloat(activeDraft.expandedCornerRadius)
+                : CGFloat(activeDraft.compactCornerRadius)
+            let pTopEarRadius: CGFloat = previewExpandedState
+                ? CGFloat(activeDraft.expandedTopCornerRadius)
+                : CGFloat(min(activeDraft.compactTopCornerRadius, 5.0))
             let pColor: Color = (activeDraft.waveformColorMode == .monochromeWhite || activeDraft.colorTheme == .monochrome)
                 ? .white.opacity(0.85)
                 : activeDraft.resolvedColor(for: .mediaAccent(source: mediaManager.currentTrack.source == .none ? .spotify : mediaManager.currentTrack.source))
             let activePreviewSurface = previewExpandedState ? activeDraft.expandedSurfaceStyle : activeDraft.compactSurfaceStyle
+            let currentBlur = previewExpandedState ? activeDraft.expandedGlassBlur : activeDraft.compactGlassBlur
+            let currentOpacity = previewExpandedState ? activeDraft.expandedOpacity : activeDraft.compactOpacity
             let pStrokeColor: Color = activePreviewSurface == .ambientGlow
                 ? pColor.opacity(min(0.6, activeDraft.borderOpacity * 2.2))
                 : Color.white.opacity(activeDraft.borderOpacity)
             let previewBatColor: Color = activeDraft.resolvedColor(for: .battery(isLow: false))
             let previewCpuColor: Color = activeDraft.resolvedColor(for: .cpu)
             let previewWeatherPrimary: Color = activeDraft.resolvedColor(for: .weatherPrimary)
-            let previewWeatherRain: Color = activeDraft.resolvedColor(for: .weatherPrecipitation)
-            let previewCalendarPrimary: Color = activeDraft.resolvedColor(for: .calendarPrimary)
-            let previewRamColor: Color = activeDraft.resolvedColor(for: .memory)
-            let previewStorageColor: Color = activeDraft.resolvedColor(for: .storage)
-            let containerH: CGFloat = previewExpandedState ? max(140, pHeight + 24) : max(66, pHeight + 20)
+            let containerH: CGFloat = previewExpandedState ? max(195, pHeight + 24) : max(74, pHeight + 24)
 
             // Display Bezel Simulator
             ZStack(alignment: .top) {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color(red: 22/255, green: 22/255, blue: 25/255))
+
+                // Simulated MacBook Top Bezel bar
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 10)
 
                 // Simulated Notch
                 ZStack(alignment: .top) {
@@ -2246,45 +2315,37 @@ public struct SettingsView: View {
                         previewExpandedNotch(
                             draftToUse: activeDraft,
                             currentTab: effectivePreviewTab,
-                            pColor: pColor,
-                            batColor: previewBatColor,
-                            cpuColor: previewCpuColor,
-                            weatherPrimary: previewWeatherPrimary,
-                            weatherRain: previewWeatherRain,
-                            calendarPrimary: previewCalendarPrimary,
-                            ramColor: previewRamColor,
-                            storageColor: previewStorageColor
+                            pColor: pColor
                         )
                         .frame(width: pWidth, height: pHeight)
                     }
                 }
+                .brightness((activeDraft.colorBrightness - 1.0) * 0.40)
                 .background(
                     ZStack {
                         switch activePreviewSurface {
                         case .pitchBlack:
-                            Color.black.opacity(activeDraft.notchOpacity)
+                            Color.black.opacity(currentOpacity)
                         case .liquidGlass:
-                            ZStack {
-                                Color.white.opacity(0.12)
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.35), Color.white.opacity(0.08), Color.clear],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            }
-                            .background(.ultraThinMaterial)
-                            .opacity(activeDraft.notchOpacity)
+                            NotchLiquidGlassSurface(
+                                bottomRadius: pRadius,
+                                topEarRadius: pTopEarRadius,
+                                blur: currentBlur,
+                                opacity: currentOpacity,
+                                isExpanded: previewExpandedState,
+                                tint: nil,
+                                drawsBorder: false
+                            )
                         case .darkGlass:
-                            ZStack {
-                                Color.black.opacity(0.65)
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.18), Color.white.opacity(0.02), Color.clear],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            }
-                            .background(.ultraThinMaterial)
-                            .opacity(activeDraft.notchOpacity)
+                            NotchLiquidGlassSurface(
+                                bottomRadius: pRadius,
+                                topEarRadius: pTopEarRadius,
+                                blur: currentBlur,
+                                opacity: currentOpacity,
+                                isExpanded: previewExpandedState,
+                                tint: Color.black.opacity(0.55),
+                                drawsBorder: false
+                            )
                         case .frostedGlass:
                             ZStack {
                                 Color(red: 14/255, green: 14/255, blue: 18/255).opacity(0.95)
@@ -2294,7 +2355,7 @@ public struct SettingsView: View {
                                     endPoint: .top
                                 )
                             }
-                            .opacity(activeDraft.notchOpacity)
+                            .opacity(currentOpacity)
                         case .ambientGlow:
                             ZStack {
                                 Color.black
@@ -2304,12 +2365,28 @@ public struct SettingsView: View {
                                     endPoint: .top
                                 )
                             }
-                            .opacity(activeDraft.notchOpacity)
+                            .opacity(currentOpacity)
                         }
 
                         if activeDraft.showBorder {
-                            UnderNotchBorder(bottomRadius: pRadius, topEarRadius: pTopEarRadius)
-                                .stroke(pStrokeColor, lineWidth: CGFloat(activeDraft.borderWidth))
+                            if activePreviewSurface.isLiquidGlass {
+                                UnderNotchBorder(bottomRadius: pRadius, topEarRadius: pTopEarRadius)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [
+                                                Color.white.opacity(min(0.24, activeDraft.borderOpacity * 0.40)),
+                                                Color.white.opacity(min(0.08, activeDraft.borderOpacity * 0.15)),
+                                                Color.white.opacity(min(0.18, activeDraft.borderOpacity * 0.30))
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: max(0.5, CGFloat(activeDraft.borderWidth))
+                                    )
+                            } else {
+                                UnderNotchBorder(bottomRadius: pRadius, topEarRadius: pTopEarRadius)
+                                    .stroke(pStrokeColor, lineWidth: CGFloat(activeDraft.borderWidth))
+                            }
                         }
                     }
                 )
@@ -2392,7 +2469,7 @@ public struct SettingsView: View {
                     }
                 }
             }
-            .frame(width: pWingSlot)
+            .frame(width: pWingSlot, alignment: .leading)
 
             Spacer()
 
@@ -2450,351 +2527,134 @@ public struct SettingsView: View {
                     }
                 }
             }
-            .frame(width: pWingSlot)
+            .frame(width: pWingSlot, alignment: .trailing)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 8)
+    }
+
+    private var batteryStatusSubtitle: String {
+        let telemetry = HardwareTelemetryService.shared
+        if telemetry.isCharging {
+            if let mins = telemetry.timeRemainingMinutes, mins > 0 {
+                let h = mins / 60
+                let m = mins % 60
+                return h > 0 ? "\(h)h \(m)m until full" : "\(m)m until full"
+            } else if telemetry.batteryPercentage >= 100 {
+                return "Fully Charged"
+            } else {
+                return "Charging"
+            }
+        } else if telemetry.isPluggedIn {
+            return telemetry.batteryPercentage >= 100 ? "Fully Charged" : "Power Adapter"
+        } else {
+            if let mins = telemetry.timeRemainingMinutes, mins > 0 {
+                let h = mins / 60
+                let m = mins % 60
+                return "\(h > 0 ? "\(h)h \(m)m" : "\(m)m") Left"
+            }
+            return "On Battery"
+        }
     }
 
     @ViewBuilder
     private func previewExpandedNotch(
         draftToUse: ObeliskSettingsDraft,
         currentTab: ObeliskTab,
-        pColor: Color,
-        batColor: Color,
-        cpuColor: Color,
-        weatherPrimary: Color,
-        weatherRain: Color,
-        calendarPrimary: Color,
-        ramColor: Color,
-        storageColor: Color
+        pColor: Color
     ) -> some View {
-        let pTopClearance = CGFloat(max(8, 12.0 + draftToUse.topNotchClearanceOffset * 0.30))
-        VStack(spacing: 5) {
-            // Header Bar
-            HStack {
-                HStack(spacing: 4) {
+        let pTopClearance = CGFloat(max(10, 14.0 + draftToUse.topNotchClearanceOffset * 0.40))
+        let contentInset = CGFloat(max(18, draftToUse.expandedTopCornerRadius + 8))
+
+        VStack(spacing: 6) {
+            // Header Bar matching live ExpandedNotchView
+            HStack(spacing: 12) {
+                // Floating navigation tabs
+                HStack(spacing: 12) {
                     ForEach(draftToUse.enabledTabs, id: \.rawValue) { tab in
-                        ZStack {
-                            Circle()
-                                .fill(currentTab == tab ? Color.white.opacity(0.18) : Color.clear)
-                                .frame(width: 14, height: 14)
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 7))
-                                .foregroundColor(currentTab == tab ? .white : .white.opacity(0.40))
+                        let isSelected = currentTab == tab
+                        Button(action: {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                                previewTab = tab
+                            }
+                        }) {
+                            VStack(spacing: 3) {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 11.5, weight: isSelected ? .semibold : .regular))
+                                    .foregroundColor(isSelected ? .white : .white.opacity(0.40))
+
+                                if isSelected {
+                                    Circle()
+                                        .fill(pColor)
+                                        .frame(width: 3.5, height: 3.5)
+                                } else {
+                                    Color.clear
+                                        .frame(width: 3.5, height: 3.5)
+                                }
+                            }
+                            .frame(height: 22)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                     }
                 }
+                .padding(.leading, 2)
+
+                Spacer()
+
+                // Floating battery status
+                HStack(spacing: 5) {
+                    BatteryPillBadge(
+                        percentage: HardwareTelemetryService.shared.batteryPercentage,
+                        isCharging: HardwareTelemetryService.shared.isCharging
+                    )
+
+                    Text("\(HardwareTelemetryService.shared.batteryPercentage)%")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(
+                            HardwareTelemetryService.shared.isCharging
+                                ? Color(red: 52/255, green: 199/255, blue: 89/255)
+                                : (HardwareTelemetryService.shared.batteryPercentage <= 20 ? Color(red: 255/255, green: 69/255, blue: 58/255) : .white)
+                        )
+
+                    let sub = batteryStatusSubtitle
+                    if !sub.isEmpty {
+                        Text("•")
+                            .font(.system(size: 8.5, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.35))
+
+                        Text(sub)
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(1)
+                    }
+                }
+
+                // Camera Mirror & Settings Actions
+                HStack(spacing: 8) {
+                    Image(systemName: "web.camera")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.60))
+                        .frame(width: 20, height: 20)
+
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.60))
+                        .frame(width: 20, height: 20)
+                }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, contentInset)
             .padding(.top, pTopClearance)
 
-            // Active Tab Preview
-            switch currentTab {
-            case .media:
-                HStack(alignment: .top, spacing: 6) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 5) {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(pColor.opacity(0.3))
-                                .frame(width: 18, height: 18)
-                                .overlay(
-                                    Image(systemName: "music.note")
-                                        .font(.system(size: 7))
-                                        .foregroundColor(.white)
-                                )
+            Divider()
+                .background(Color.white.opacity(0.08))
+                .padding(.horizontal, contentInset - 4)
 
-                            VStack(alignment: .leading, spacing: 0.5) {
-                                Text(mediaManager.currentTrack.title.isEmpty ? "Paper Sky" : mediaManager.currentTrack.title)
-                                    .font(.system(size: 8, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                Text(mediaManager.currentTrack.artist.isEmpty ? "Lumen Coast" : mediaManager.currentTrack.artist)
-                                    .font(.system(size: 6.5))
-                                    .foregroundColor(.white.opacity(0.45))
-                                    .lineLimit(1)
-                            }
-                        }
-
-                        // Mini progress bar
-                        Capsule()
-                            .fill(Color.white.opacity(0.15))
-                            .frame(height: 2)
-                            .overlay(
-                                Capsule().fill(pColor).frame(maxWidth: .infinity, alignment: .leading).frame(width: 35)
-                            )
-
-                        HStack(spacing: 8) {
-                            Image(systemName: "quote.bubble.fill").font(.system(size: 6.5)).foregroundColor(.white.opacity(0.5))
-                            Spacer()
-                            Image(systemName: "backward.fill").font(.system(size: 6))
-                            Image(systemName: "play.fill").font(.system(size: 7, weight: .bold))
-                            Image(systemName: "forward.fill").font(.system(size: 6))
-                            Spacer()
-                            Image(systemName: "speaker.wave.2.fill").font(.system(size: 6)).foregroundColor(.white.opacity(0.5))
-                        }
-                        .foregroundColor(.white.opacity(0.7))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: 1, height: 38)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("we fold the summer light")
-                            .font(.system(size: 6.5))
-                            .foregroundColor(.white.opacity(0.35))
-                        Text("into paper birds tonight")
-                            .font(.system(size: 7.5, weight: .bold))
-                            .foregroundColor(.white)
-                        Text("and send them through the sky")
-                            .font(.system(size: 6.5))
-                            .foregroundColor(.white.opacity(0.35))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(.horizontal, 10)
-
-            case .weather:
-                HStack(alignment: .center, spacing: 0) {
-                    // Hero
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(weatherService.weather.cityName.isEmpty ? "South Jakarta" : weatherService.weather.cityName)
-                            .font(.system(size: 7, weight: .medium))
-                            .foregroundColor(.white.opacity(0.85))
-                            .lineLimit(1)
-
-                        Text("\(draftToUse.convertedTemperature(weatherService.weather.temperature))°")
-                            .font(.system(size: 20, weight: .thin))
-                            .foregroundColor(.white)
-
-                        Text(weatherService.weather.conditionText.isEmpty ? "Clear" : weatherService.weather.conditionText)
-                            .font(.system(size: 6.5, weight: .medium))
-                            .foregroundColor(.white.opacity(0.85))
-
-                        Text("H 32°  L 24°")
-                            .font(.system(size: 5.5))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    .frame(width: 58, alignment: .leading)
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: 1, height: 38)
-                        .padding(.horizontal, 4)
-
-                    // Mini Curve Forecast
-                    VStack(spacing: 2) {
-                        HStack(spacing: 4) {
-                            ForEach(["Now", "15", "16", "17", "18"], id: \.self) { hr in
-                                VStack(spacing: 1) {
-                                    Image(systemName: "cloud.sun.fill")
-                                        .font(.system(size: 6))
-                                        .foregroundColor(weatherPrimary)
-                                    Text(hr)
-                                        .font(.system(size: 5))
-                                        .foregroundColor(.white.opacity(0.45))
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: 1, height: 38)
-                        .padding(.horizontal, 4)
-
-                    // Details
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack {
-                            Text("Feels").font(.system(size: 5.5)).foregroundColor(.white.opacity(0.5))
-                            Spacer()
-                            Text("31°").font(.system(size: 5.5, weight: .medium)).foregroundColor(.white)
-                        }
-                        HStack {
-                            Text("Rain").font(.system(size: 5.5)).foregroundColor(.white.opacity(0.5))
-                            Spacer()
-                            Text("0%").font(.system(size: 5.5, weight: .medium)).foregroundColor(.white)
-                        }
-                        HStack {
-                            Text("Wind").font(.system(size: 5.5)).foregroundColor(.white.opacity(0.5))
-                            Spacer()
-                            Text("12 km/h").font(.system(size: 5.5, weight: .medium)).foregroundColor(.white)
-                        }
-                    }
-                    .frame(width: 52, alignment: .leading)
-                }
-                .padding(.horizontal, 10)
-                .brightness((draftToUse.colorBrightness - 1.0) * 0.40)
-
-            case .calendar:
-                HStack(alignment: .center, spacing: 0) {
-                    // Agenda
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("THURSDAY")
-                            .font(.system(size: 6, weight: .semibold))
-                            .tracking(0.6)
-                            .foregroundColor(calendarPrimary)
-
-                        Text("5 November")
-                            .font(.system(size: 13, weight: .light))
-                            .foregroundColor(.white)
-
-                        Text("No upcoming events today")
-                            .font(.system(size: 6))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    .frame(width: 68, alignment: .leading)
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: 1, height: 38)
-                        .padding(.horizontal, 4)
-
-                    // Mini Month Grid
-                    VStack(spacing: 2) {
-                        HStack(spacing: 0) {
-                            ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { idx, day in
-                                Text(day)
-                                    .font(.system(size: 5, weight: .medium))
-                                    .foregroundColor((idx == 0 || idx == 6) ? Color(red: 1.0, green: 0.32, blue: 0.35) : .white.opacity(0.4))
-                                    .frame(maxWidth: .infinity)
-                            }
-                        }
-
-                        HStack(spacing: 0) {
-                            ForEach(1...7, id: \.self) { d in
-                                let isToday = (d == 5)
-                                let isWeekend = (d == 1 || d == 7)
-                                let hasEv = (d == 3 || d == 6)
-                                ZStack {
-                                    if isToday {
-                                        Capsule().fill(Color.white).frame(width: hasEv ? 12 : 9, height: 9)
-                                    }
-                                    HStack(spacing: 1) {
-                                        if hasEv {
-                                            Capsule()
-                                                .fill(calendarPrimary)
-                                                .frame(width: 1, height: 4.5)
-                                        }
-
-                                        Text("\(d)")
-                                            .font(.system(size: 5.5, weight: isToday ? .bold : .regular))
-                                            .foregroundColor(isToday ? .black : (isWeekend ? Color(red: 1.0, green: 0.32, blue: 0.35) : .white.opacity(0.75)))
-                                    }
-                                }
-                                .frame(maxWidth: .infinity)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .padding(.horizontal, 10)
-                .brightness((draftToUse.colorBrightness - 1.0) * 0.40)
-
-            case .file:
-                HStack(spacing: 6) {
-                    // Box 1: File Tray
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "tray.full.fill").font(.system(size: 6.5, weight: .bold)).foregroundColor(.green)
-                            Text("File Tray").font(.system(size: 6.5, weight: .bold)).foregroundColor(.white)
-                            Spacer()
-                            Text("2").font(.system(size: 5.5, weight: .bold)).foregroundColor(.white.opacity(0.7))
-                        }
-                        VStack(alignment: .leading, spacing: 1.5) {
-                            HStack(spacing: 2) {
-                                Image(systemName: "doc.fill").font(.system(size: 5.5)).foregroundColor(.white.opacity(0.6))
-                                Text("Spec.pdf").font(.system(size: 5.5)).foregroundColor(.white.opacity(0.8)).lineLimit(1)
-                            }
-                            HStack(spacing: 2) {
-                                Image(systemName: "photo.fill").font(.system(size: 5.5)).foregroundColor(.white.opacity(0.6))
-                                Text("Hero.png").font(.system(size: 5.5)).foregroundColor(.white.opacity(0.8)).lineLimit(1)
-                            }
-                        }
-                    }
-                    .padding(5)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
-                    .frame(maxWidth: .infinity)
-
-                    // Box 2: AirDrop
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "antenna.radiowaves.left.and.right").font(.system(size: 6.5, weight: .bold)).foregroundColor(.blue)
-                            Text("AirDrop").font(.system(size: 6.5, weight: .bold)).foregroundColor(.white)
-                            Spacer()
-                            Circle().fill(Color.green).frame(width: 3, height: 3)
-                        }
-                        VStack(spacing: 1.5) {
-                            Image(systemName: "antenna.radiowaves.left.and.right").font(.system(size: 8)).foregroundColor(.blue)
-                            Text("Drop to share").font(.system(size: 5.5, weight: .semibold)).foregroundColor(.white.opacity(0.8))
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                    .padding(5)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.blue.opacity(0.3), lineWidth: 0.5))
-                    .frame(maxWidth: .infinity)
-                }
-                .padding(.horizontal, 10)
-                .brightness((draftToUse.colorBrightness - 1.0) * 0.40)
-
-            case .alert:
-                HStack(spacing: 6) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "alarm.fill").font(.system(size: 6.5, weight: .bold)).foregroundColor(Color(red: 255/255, green: 159/255, blue: 10/255))
-                            Text("Scheduled Alerts").font(.system(size: 6.5, weight: .bold)).foregroundColor(.white)
-                            Spacer()
-                            Text("1 Active").font(.system(size: 5.5, weight: .bold)).foregroundColor(.white.opacity(0.7))
-                        }
-                        VStack(alignment: .leading, spacing: 1.5) {
-                            HStack(spacing: 3) {
-                                Text("08:30").font(.system(size: 5.5, weight: .bold)).monospacedDigit().foregroundColor(Color(red: 255/255, green: 159/255, blue: 10/255))
-                                Text("Fill Work Attendance • Mon-Fri").font(.system(size: 5.5, weight: .medium)).foregroundColor(.white.opacity(0.85)).lineLimit(1)
-                            }
-                        }
-                    }
-                    .padding(5)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
-                    .frame(maxWidth: .infinity)
-                }
-                .padding(.horizontal, 10)
-                .brightness((draftToUse.colorBrightness - 1.0) * 0.40)
-
-            case .notification:
-                HStack(spacing: 6) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "bell.badge.fill").font(.system(size: 6.5, weight: .bold)).foregroundColor(Color(red: 52/255, green: 199/255, blue: 89/255))
-                            Text("Notifications").font(.system(size: 6.5, weight: .bold)).foregroundColor(.white)
-                            Spacer()
-                            Text("3").font(.system(size: 5.5, weight: .bold)).foregroundColor(.white.opacity(0.7))
-                        }
-                        VStack(alignment: .leading, spacing: 1.5) {
-                            HStack(spacing: 3) {
-                                Circle().fill(Color.green).frame(width: 4, height: 4)
-                                Text("WhatsApp • Sarah Jenkins").font(.system(size: 5.5, weight: .medium)).foregroundColor(.white.opacity(0.85)).lineLimit(1)
-                            }
-                            HStack(spacing: 3) {
-                                Circle().fill(Color.blue).frame(width: 4, height: 4)
-                                Text("Mail • Alexander Satryo").font(.system(size: 5.5, weight: .medium)).foregroundColor(.white.opacity(0.85)).lineLimit(1)
-                            }
-                        }
-                    }
-                    .padding(5)
-                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.05)))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
-                    .frame(maxWidth: .infinity)
-                }
-                .padding(.horizontal, 10)
-                .brightness((draftToUse.colorBrightness - 1.0) * 0.40)
-            }
+            // Dynamic Tab Content (100% precision live page mirroring live notch)
+            NotchPageView(tab: currentTab)
+                .padding(.horizontal, contentInset)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .padding(.bottom, 6)
     }
 }
 
@@ -2814,12 +2674,6 @@ struct PreferenceSection<Content: View>: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(isHighlighted ? Color.blue.opacity(0.9) : Color.white.opacity(0.42))
                     .tracking(0.6)
-
-                if isHighlighted {
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 5, height: 5)
-                }
             }
             .padding(.leading, 6)
 
@@ -3064,14 +2918,8 @@ struct PreferenceSliderRow: View {
                     Spacer()
 
                     Text(displayedValueText)
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.85))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2.5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .fill(Color.white.opacity(0.07))
-                        )
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(.white.opacity(0.65))
                 }
 
                 if mode == .normalized0To100 {
@@ -3132,29 +2980,30 @@ struct ModernMenuPicker<T: Equatable>: View {
 
                 Spacer(minLength: 4)
 
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 8.5, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.42))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7.5, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.35))
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 5.5)
+            .padding(.vertical, 5)
             .frame(width: width)
             .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(isHovered ? Color.white.opacity(0.10) : Color.white.opacity(0.06))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(isHovered ? Color.white.opacity(0.16) : Color.white.opacity(0.09), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(isHovered ? Color.white.opacity(0.18) : Color.white.opacity(0.10), lineWidth: 0.5)
             )
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .fixedSize()
         .onHover { isHovered = $0 }
     }
 }
 
-/// Modern styled button with subtle rounded corners, micro-interaction hover, and crisp typography
+/// Refined Apple macOS native styled button with subtle rounded corners and clean typography
 struct ModernButton: View {
     let title: String
     var icon: String? = nil
@@ -3172,33 +3021,29 @@ struct ModernButton: View {
                         .font(.system(size: 9.5, weight: isProminent ? .semibold : .medium))
                 }
                 Text(title)
-                    .font(.system(size: 11.5, weight: isProminent ? .semibold : .medium))
+                    .font(.system(size: 12, weight: isProminent ? .semibold : .medium))
             }
             .foregroundColor(
-                isDestructive ? Color.red.opacity(0.92) :
                 isProminent ? Color.white :
+                isDestructive ? (isHovered ? Color.red.opacity(0.95) : Color.white.opacity(0.85)) :
                 Color.white.opacity(0.88)
             )
             .padding(.horizontal, 11)
-            .padding(.vertical, 5)
+            .padding(.vertical, 4.5)
             .background(
-                RoundedRectangle(cornerRadius: 6.5, style: .continuous)
+                RoundedRectangle(cornerRadius: 5.5, style: .continuous)
                     .fill(
                         isProminent
                             ? Color.blue.opacity(isHovered ? 0.95 : 0.85)
-                            : isDestructive
-                                ? Color.red.opacity(isHovered ? 0.16 : 0.08)
-                                : Color.white.opacity(isHovered ? 0.12 : 0.07)
+                            : Color.white.opacity(isHovered ? 0.12 : 0.06)
                     )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 6.5, style: .continuous)
+                RoundedRectangle(cornerRadius: 5.5, style: .continuous)
                     .stroke(
                         isProminent
-                            ? Color.blue.opacity(0.4)
-                            : isDestructive
-                                ? Color.red.opacity(0.24)
-                                : Color.white.opacity(0.12),
+                            ? Color.blue.opacity(0.35)
+                            : Color.white.opacity(isHovered ? 0.16 : 0.09),
                         lineWidth: 0.5
                     )
             )
@@ -3225,16 +3070,15 @@ public final class SettingsWindowManager: NSObject, NSWindowDelegate {
             if existing.isMiniaturized {
                 existing.deminiaturize(nil)
             }
-            existing.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
-            existing.level = .floating
-            existing.orderFrontRegardless()
+            existing.collectionBehavior = [.moveToActiveSpace]
+            existing.level = .normal
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
 
         let settingsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 840, height: 620),
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 640),
             styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -3245,8 +3089,8 @@ public final class SettingsWindowManager: NSObject, NSWindowDelegate {
         settingsWindow.backgroundColor = NSColor(red: 16/255, green: 16/255, blue: 18/255, alpha: 1.0)
         settingsWindow.appearance = NSAppearance(named: .darkAqua)
         settingsWindow.isReleasedWhenClosed = false
-        settingsWindow.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
-        settingsWindow.level = .floating
+        settingsWindow.collectionBehavior = [.moveToActiveSpace]
+        settingsWindow.level = .normal
         settingsWindow.delegate = self
         settingsWindow.center()
 
@@ -3254,7 +3098,6 @@ public final class SettingsWindowManager: NSObject, NSWindowDelegate {
         settingsWindow.contentView = hosting
 
         self.window = settingsWindow
-        settingsWindow.orderFrontRegardless()
         settingsWindow.makeKeyAndOrderFront(nil)
         settingsWindow.makeFirstResponder(nil)
         NSApp.activate(ignoringOtherApps: true)

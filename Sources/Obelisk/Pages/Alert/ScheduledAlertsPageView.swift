@@ -42,7 +42,6 @@ public struct ScheduledAlertsPageView: View {
         }
         .frame(height: contentHeight)
         .padding(.top, 2)
-        .brightness((settings.colorBrightness - 1.0) * 0.40)
     }
 
     // MARK: - Left Column: Alerts List
@@ -404,9 +403,9 @@ public struct ScheduledAlertsPageView: View {
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundColor(.white.opacity(0.92))
 
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 7.5, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.45))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7.0, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.35))
             }
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
@@ -420,6 +419,7 @@ public struct ScheduledAlertsPageView: View {
             )
         }
         .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
         .pointingHandCursor()
     }
 

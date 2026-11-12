@@ -28,6 +28,8 @@
     <string>Obelisk accesses microphone state to provide instant mute/unmute controls and privacy status indicators.</string>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>Obelisk uses Bluetooth to detect connected earbuds and headphones (such as Samsung Galaxy Buds and AirPods) and display battery telemetry.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Obelisk talks to Spotify and Apple Music to read the current track, playback position and to show synchronized lyrics.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Obelisk accesses your calendar to display upcoming events and schedules inside the notch.</string>
     <key>NSCalendarsUsageDescription</key>

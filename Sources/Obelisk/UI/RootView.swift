@@ -70,7 +70,9 @@ public struct RootView: View {
             // 100% solid OLED pitch black like the physical MacBook camera housing
             return 1.0
         }
-        return min(1.0, max(0.2, settings.notchOpacity))
+        return showsExpanded
+            ? min(1.0, max(0.15, settings.expandedOpacity))
+            : min(1.0, max(0.15, settings.compactOpacity))
     }
 
     private var activeSurfaceStyle: NotchSurfaceStyle {
@@ -104,14 +106,17 @@ public struct RootView: View {
     }
 
     public var body: some View {
+        let showDropShadow = showsExpanded && !windowManager.isCollapsing
+
         ZStack(alignment: .top) {
             ZStack(alignment: .top) {
                 if showsExpanded {
                     // Expanded Dashboard (multi-tab: Media, Weather, Calendar, File, Notifications)
                     ExpandedNotchView(windowManager: windowManager)
                         .transition(
-                            .opacity.combined(
-                                with: .scale(scale: 0.96, anchor: .top)
+                            .asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top)),
+                                removal: .opacity.animation(.easeOut(duration: 0.08))
                             )
                         )
 
@@ -142,13 +147,15 @@ public struct RootView: View {
                         }
                 }
             }
+            .brightness((settings.colorBrightness - 1.0) * 0.40)
             .frame(width: currentWidth, height: currentHeight, alignment: .top)
             .background(notchBackgroundSurface)
             .clipShape(NotchShape(bottomRadius: currentRadius, topEarRadius: currentTopEarRadius))
+            .overlay(notchBorderOverlay)
             .shadow(
-                color: shadowColor,
-                radius: showsExpanded ? 14 : 0,
-                y: showsExpanded ? 7 : 0
+                color: showDropShadow ? shadowColor : .clear,
+                radius: showDropShadow ? 12 : 0,
+                y: showDropShadow ? 6 : 0
             )
             .contentShape(NotchShape(bottomRadius: currentRadius, topEarRadius: currentTopEarRadius))
         }
@@ -156,32 +163,34 @@ public struct RootView: View {
     }
 
     @ViewBuilder
-    private func surfaceBody(for style: NotchSurfaceStyle, isExpandedMode: Bool) -> some View {
+    private func surfaceBody(for style: NotchSurfaceStyle, isExpandedMode: Bool, isVisible: Bool) -> some View {
         switch style {
         case .pitchBlack:
             Color.black
 
         case .liquidGlass:
-            ZStack {
-                Rectangle().fill(.ultraThinMaterial)
-                Color.white.opacity(0.12)
-                LinearGradient(
-                    colors: [Color.white.opacity(0.32), Color.white.opacity(0.08), Color.clear],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
+            NotchLiquidGlassSurface(
+                bottomRadius: currentRadius,
+                topEarRadius: currentTopEarRadius,
+                blur: isExpandedMode ? settings.expandedGlassBlur : settings.compactGlassBlur,
+                opacity: isExpandedMode ? settings.expandedOpacity : settings.compactOpacity,
+                isExpanded: isExpandedMode,
+                tint: nil,
+                drawsBorder: false,
+                isVisible: isVisible
+            )
 
         case .darkGlass:
-            ZStack {
-                Rectangle().fill(.ultraThinMaterial)
-                Color.black.opacity(0.65)
-                LinearGradient(
-                    colors: [Color.white.opacity(0.18), Color.white.opacity(0.02), Color.clear],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
+            NotchLiquidGlassSurface(
+                bottomRadius: currentRadius,
+                topEarRadius: currentTopEarRadius,
+                blur: isExpandedMode ? settings.expandedGlassBlur : settings.compactGlassBlur,
+                opacity: isExpandedMode ? settings.expandedOpacity : settings.compactOpacity,
+                isExpanded: isExpandedMode,
+                tint: Color.black.opacity(0.55),
+                drawsBorder: false,
+                isVisible: isVisible
+            )
 
         case .frostedGlass:
             ZStack {
@@ -215,26 +224,78 @@ public struct RootView: View {
     private var notchBackgroundSurface: some View {
         let compactStyle = isNativeBlackStandbyHUD ? .pitchBlack : settings.compactSurfaceStyle
         let expandedStyle = settings.expandedSurfaceStyle
+        let expOp = min(1.0, max(0.15, settings.expandedOpacity))
+        let cmpOp = isNativeBlackStandbyHUD ? 1.0 : min(1.0, max(0.15, settings.compactOpacity))
 
         ZStack {
-            if compactStyle == expandedStyle {
-                surfaceBody(for: expandedStyle, isExpandedMode: showsExpanded)
-                    .opacity(surfaceOpacity)
-            } else {
-                // Crossfade smoothly between compact and expanded surface materials without pitch black delay
-                surfaceBody(for: compactStyle, isExpandedMode: false)
-                    .opacity(showsExpanded ? 0 : surfaceOpacity)
-                surfaceBody(for: expandedStyle, isExpandedMode: true)
-                    .opacity(showsExpanded ? surfaceOpacity : 0)
-            }
+            // Persistent expanded material layer — never inserted/removed so its geometry always morphs in lockstep
+            surfaceBody(
+                for: expandedStyle,
+                isExpandedMode: showsExpanded,
+                isVisible: showsExpanded || compactStyle == expandedStyle
+            )
+            .opacity(showsExpanded ? expOp : (compactStyle == expandedStyle ? cmpOp : 0.0))
 
-            if settings.showBorder {
-                UnderNotchBorder(bottomRadius: currentRadius, topEarRadius: currentTopEarRadius)
-                    .stroke(
-                        borderStrokeColor,
-                        lineWidth: CGFloat(windowManager.isExpanded ? settings.borderWidth : max(0.5, settings.borderWidth * 0.85))
-                    )
+            // Persistent compact material layer (when distinct from expandedStyle) — morphs from expandedSize to compactSize smoothly
+            if compactStyle != expandedStyle {
+                surfaceBody(
+                    for: compactStyle,
+                    isExpandedMode: false,
+                    isVisible: !showsExpanded
+                )
+                .opacity(showsExpanded ? 0.0 : cmpOp)
             }
+        }
+    }
+
+    private var notchBorderOverlay: some View {
+        let isGlass = activeSurfaceStyle.isLiquidGlass && !isNativeBlackStandbyHUD
+        let op = isGlass ? (showsExpanded ? settings.expandedOpacity : settings.compactOpacity) : 0.0
+        let showCustomBorder = settings.showBorder && !isNativeBlackStandbyHUD
+
+        return ZStack {
+            // Soft, harmonious 3D curved lens bevel refraction (always in view tree so path morphs without freezing)
+            UnderNotchBorder(bottomRadius: currentRadius, topEarRadius: currentTopEarRadius)
+                .stroke(
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color.white.opacity(0.18 * op), location: 0.0),
+                            .init(color: Color.white.opacity(0.04 * op), location: 0.35),
+                            .init(color: Color.white.opacity(0.10 * op), location: 0.70),
+                            .init(color: Color.white.opacity(0.16 * op), location: 1.0)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.8
+                )
+                .blur(radius: 0.8)
+                .opacity(isGlass ? 1.0 : 0.0)
+
+            // Delicate, elegant outer glass rim that blends smoothly with the notch
+            UnderNotchBorder(bottomRadius: currentRadius, topEarRadius: currentTopEarRadius)
+                .stroke(
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color.white.opacity(0.24 * op), location: 0.0),
+                            .init(color: Color.white.opacity(0.08 * op), location: 0.40),
+                            .init(color: Color.white.opacity(0.14 * op), location: 0.70),
+                            .init(color: Color.white.opacity(0.20 * op), location: 1.0)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.75
+                )
+                .opacity(isGlass ? 1.0 : 0.0)
+
+            // User-configurable hairline rim border
+            UnderNotchBorder(bottomRadius: currentRadius, topEarRadius: currentTopEarRadius)
+                .stroke(
+                    borderStrokeColor,
+                    lineWidth: CGFloat(showsExpanded ? settings.borderWidth : max(0.5, settings.borderWidth * 0.85))
+                )
+                .opacity(showCustomBorder ? 1.0 : 0.0)
         }
     }
 
@@ -243,29 +304,10 @@ public struct RootView: View {
         if activeSurfaceStyle == .ambientGlow && mediaManager.currentTrack.source != .none {
             return sourceAccentColor.opacity(0.32)
         }
-        return Color.black.opacity(0.55)
-    }
-}
-
-// MARK: - Liquid Glass Surface
-
-/// Renders the notch body with Apple's ultra thin material blur and specular reflection gradient.
-struct NotchLiquidGlassSurface: View {
-    let shape: NotchShape
-    let tint: Color?
-    let opacity: Double
-
-    var body: some View {
-        ZStack {
-            Rectangle().fill(.ultraThinMaterial)
-            if let tint { tint }
-            LinearGradient(
-                colors: [Color.white.opacity(0.20), Color.white.opacity(0.04), Color.clear],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+        if activeSurfaceStyle == .liquidGlass {
+            return Color.black.opacity(0.38)
         }
-        .opacity(opacity)
+        return Color.black.opacity(0.55)
     }
 }
 

@@ -243,12 +243,13 @@ public struct NotificationHistoryView: View {
                             .font(.system(size: 11.5, weight: .semibold))
                             .foregroundColor(.white.opacity(0.92))
 
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.40))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 7.5, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.35))
                     }
                 }
                 .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
                 .pointingHandCursor()
 
                 if settings.notificationFilterCategory != .all {
@@ -261,7 +262,7 @@ public struct NotificationHistoryView: View {
 
                 if !monitor.isAccessibilityTrusted {
                     Button(action: {
-                        monitor.requestAccessibilityPermission(resetTCC: true)
+                        monitor.requestAccessibilityPermission()
                     }) {
                         HStack(spacing: 3.5) {
                             Image(systemName: "exclamationmark.shield.fill")

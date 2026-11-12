@@ -29,10 +29,7 @@ public final class ScheduledAlertService: ObservableObject {
     public func loadAlerts() {
         if let data = UserDefaults.standard.data(forKey: storageKey),
            let decoded = try? JSONDecoder().decode([ScheduledAlertItem].self, from: data) {
-            self.alerts = decoded.filter { $0.title != "Fill Work Attendance" }
-            if self.alerts.count != decoded.count {
-                saveAlerts()
-            }
+            self.alerts = decoded
         } else {
             self.alerts = []
             saveAlerts()
@@ -113,6 +110,12 @@ public final class ScheduledAlertService: ObservableObject {
 
             if alert.shouldTrigger(at: now, calendar: cal) {
                 lastFiredKeys.insert(alertKey)
+                if alert.recurrence == .once {
+                    if let idx = alerts.firstIndex(where: { $0.id == alert.id }) {
+                        alerts[idx].isEnabled = false
+                        saveAlerts()
+                    }
+                }
                 triggerAlert(alert)
                 break // Trigger one alert per tick
             }

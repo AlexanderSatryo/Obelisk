@@ -71,7 +71,6 @@ public struct CalendarAgendaView: View {
         }
         .frame(height: contentHeight)
         .padding(.top, 2)
-        .brightness((settings.colorBrightness - 1.0) * 0.40)
         .onAppear {
             calendarService.fetchAgenda(force: true)
         }

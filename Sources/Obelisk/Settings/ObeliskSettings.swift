@@ -474,7 +474,14 @@ public struct ObeliskSettingsDraft: Equatable {
     public var expandedCornerRadius: Double = 18.0
     public var compactTopCornerRadius: Double = 11.0
     public var expandedTopCornerRadius: Double = 14.0
-    public var notchOpacity: Double = 1.0
+    public var compactOpacity: Double = 1.0
+    public var compactGlassBlur: Double = 0.75
+    public var expandedOpacity: Double = 0.75
+    public var expandedGlassBlur: Double = 0.75
+    public var notchOpacity: Double {
+        get { expandedOpacity }
+        set { expandedOpacity = newValue }
+    }
     public var compactWingMode: CompactWingMode = .dynamicAuto
     public var leftWingContent: LeftWingContentMode = .artworkOrLogo
     public var rightWingStyle: RightWingStyle = .equalizerBars
@@ -577,7 +584,10 @@ public struct ObeliskSettingsDraft: Equatable {
             self.expandedCornerRadius = def.expandedCornerRadius
             self.compactTopCornerRadius = def.compactTopCornerRadius
             self.expandedTopCornerRadius = def.expandedTopCornerRadius
-            self.notchOpacity = def.notchOpacity
+            self.compactOpacity = def.compactOpacity
+            self.compactGlassBlur = def.compactGlassBlur
+            self.expandedOpacity = def.expandedOpacity
+            self.expandedGlassBlur = def.expandedGlassBlur
             self.compactWingMode = def.compactWingMode
             self.leftWingContent = def.leftWingContent
             self.rightWingStyle = def.rightWingStyle
@@ -696,6 +706,21 @@ public final class ObeliskSettings: ObservableObject {
     }
     @Published public var expandedTopCornerRadius: Double {
         didSet { defaults.set(expandedTopCornerRadius, forKey: "cfg_expandedTopCornerRadius") }
+    }
+    @Published public var compactOpacity: Double {
+        didSet { defaults.set(compactOpacity, forKey: "cfg_compactOpacity") }
+    }
+    @Published public var compactGlassBlur: Double {
+        didSet { defaults.set(compactGlassBlur, forKey: "cfg_compactGlassBlur") }
+    }
+    @Published public var expandedOpacity: Double {
+        didSet {
+            defaults.set(expandedOpacity, forKey: "cfg_expandedOpacity")
+            notchOpacity = expandedOpacity
+        }
+    }
+    @Published public var expandedGlassBlur: Double {
+        didSet { defaults.set(expandedGlassBlur, forKey: "cfg_expandedGlassBlur") }
     }
     @Published public var notchOpacity: Double {
         didSet { defaults.set(notchOpacity, forKey: "cfg_notchOpacity") }
@@ -1003,7 +1028,12 @@ public final class ObeliskSettings: ObservableObject {
         self.expandedCornerRadius = defaults.object(forKey: "cfg_expandedCornerRadius") as? Double ?? 18.0
         self.compactTopCornerRadius = defaults.object(forKey: "cfg_compactTopCornerRadius") as? Double ?? 11.0
         self.expandedTopCornerRadius = defaults.object(forKey: "cfg_expandedTopCornerRadius") as? Double ?? 14.0
-        self.notchOpacity = defaults.object(forKey: "cfg_notchOpacity") as? Double ?? 1.0
+        self.compactOpacity = defaults.object(forKey: "cfg_compactOpacity") as? Double ?? 1.0
+        self.compactGlassBlur = defaults.object(forKey: "cfg_compactGlassBlur") as? Double ?? 0.75
+        let loadedExpOpacity = defaults.object(forKey: "cfg_expandedOpacity") as? Double ?? defaults.object(forKey: "cfg_notchOpacity") as? Double ?? 0.75
+        self.expandedOpacity = loadedExpOpacity
+        self.expandedGlassBlur = defaults.object(forKey: "cfg_expandedGlassBlur") as? Double ?? 0.75
+        self.notchOpacity = loadedExpOpacity
         self.compactWingMode = CompactWingMode(rawValue: defaults.string(forKey: "cfg_compactWingMode") ?? "") ?? .dynamicAuto
         self.leftWingContent = LeftWingContentMode(rawValue: defaults.string(forKey: "cfg_leftWingContent") ?? "") ?? .artworkOrLogo
         self.rightWingStyle = RightWingStyle(rawValue: defaults.string(forKey: "cfg_rightWingStyle") ?? "") ?? .equalizerBars
@@ -1093,7 +1123,10 @@ public final class ObeliskSettings: ObservableObject {
         d.expandedCornerRadius = expandedCornerRadius
         d.compactTopCornerRadius = compactTopCornerRadius
         d.expandedTopCornerRadius = expandedTopCornerRadius
-        d.notchOpacity = notchOpacity
+        d.compactOpacity = compactOpacity
+        d.compactGlassBlur = compactGlassBlur
+        d.expandedOpacity = expandedOpacity
+        d.expandedGlassBlur = expandedGlassBlur
         d.compactWingMode = compactWingMode
         d.leftWingContent = leftWingContent
         d.rightWingStyle = rightWingStyle
@@ -1167,7 +1200,11 @@ public final class ObeliskSettings: ObservableObject {
         expandedCornerRadius = draft.expandedCornerRadius
         compactTopCornerRadius = draft.compactTopCornerRadius
         expandedTopCornerRadius = draft.expandedTopCornerRadius
-        notchOpacity = draft.notchOpacity
+        compactOpacity = draft.compactOpacity
+        compactGlassBlur = draft.compactGlassBlur
+        expandedOpacity = draft.expandedOpacity
+        expandedGlassBlur = draft.expandedGlassBlur
+        notchOpacity = draft.expandedOpacity
         compactWingMode = draft.compactWingMode
         leftWingContent = draft.leftWingContent
         rightWingStyle = draft.rightWingStyle
@@ -1392,7 +1429,7 @@ public final class ObeliskSettings: ObservableObject {
         return ObeliskSettings.adjustBrightness(of: rawColor, factor: brightness)
     }
 
-    /// Dynamically scales color brightness and vibrancy
+    /// Dynamically scales color brightness and vibrancy across 0.5...1.5
     public nonisolated static func adjustBrightness(of color: Color, factor: Double) -> Color {
         guard abs(factor - 1.0) > 0.01 else { return color }
         let ns = NSColor(color).usingColorSpace(.sRGB) ?? NSColor(color)
@@ -1401,13 +1438,14 @@ public final class ObeliskSettings: ObservableObject {
         if s < 0.05 {
             var r: CGFloat = 0, g: CGFloat = 0, bl: CGFloat = 0
             ns.getRed(&r, green: &g, blue: &bl, alpha: &a)
-            let adjR = min(1.0, max(0.1, r * CGFloat(factor)))
-            let adjG = min(1.0, max(0.1, g * CGFloat(factor)))
-            let adjB = min(1.0, max(0.1, bl * CGFloat(factor)))
-            return Color(nsColor: NSColor(red: adjR, green: adjG, blue: adjB, alpha: a))
+            let adjR = min(1.0, max(0.15, r * CGFloat(factor)))
+            let adjG = min(1.0, max(0.15, g * CGFloat(factor)))
+            let adjB = min(1.0, max(0.15, bl * CGFloat(factor)))
+            let adjA = factor > 1.0 ? min(1.0, a + CGFloat((factor - 1.0) * 0.25)) : max(0.25, a * CGFloat(factor))
+            return Color(nsColor: NSColor(red: adjR, green: adjG, blue: adjB, alpha: adjA))
         }
-        let newB = min(1.0, max(0.15, b * CGFloat(factor)))
-        let newS = factor > 1.0 ? max(0.15, s - CGFloat((factor - 1.0) * 0.35)) : s
+        let newB = min(1.0, max(0.20, b * CGFloat(factor)))
+        let newS = factor > 1.0 ? max(0.10, s - CGFloat((factor - 1.0) * 0.55)) : min(1.0, s * CGFloat(0.85 + factor * 0.15))
         return Color(nsColor: NSColor(hue: h, saturation: newS, brightness: newB, alpha: a))
     }
 

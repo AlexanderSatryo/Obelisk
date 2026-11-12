@@ -50,6 +50,18 @@ public final class MediaRemoteBridge: @unchecked Sendable {
     public static let shared = MediaRemoteBridge()
 
     public private(set) var isAvailable: Bool = true
+    /// Timestamp of the last payload received from the sidecar (nil until the first one arrives).
+    public private(set) var lastPayloadDate: Date?
+    private var consecutiveSilentLaunches = 0
+    private let launchDate = Date()
+
+    /// True while the sidecar is alive and actually delivering data.
+    public var isHealthy: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard isAvailable, let last = lastPayloadDate else { return false }
+        return Date().timeIntervalSince(last) < 6.0
+    }
     public private(set) var latestPlayers: [RemoteMediaState] = []
     public var activeTargetKey: String = ""
 
@@ -449,14 +461,56 @@ RunLoop.main.run()
         try? script.write(toFile: sidecarScriptPath, atomically: true, encoding: .utf8)
     }
 
+    private func locateDylib() -> String? {
+        let fm = FileManager.default
+        var candidates: [String] = []
+
+        // 1. App bundle Contents/Frameworks/
+        if let fwURL = Bundle.main.bundleURL.appendingPathComponent("Contents/Frameworks/libObeliskMediaRemoteNative.dylib", isDirectory: false) as URL? {
+            candidates.append(fwURL.path)
+        }
+        // 2. App bundle Contents/Resources/
+        if let resURL = Bundle.main.resourceURL?.appendingPathComponent("libObeliskMediaRemoteNative.dylib") {
+            candidates.append(resURL.path)
+        }
+        // 3. App bundle Contents/MacOS/
+        if let macosURL = Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("libObeliskMediaRemoteNative.dylib") {
+            candidates.append(macosURL.path)
+        }
+        // 4. Installed standard locations
+        candidates.append("/Applications/Obelisk.app/Contents/Frameworks/libObeliskMediaRemoteNative.dylib")
+        candidates.append("/Applications/Obelisk.app/Contents/Resources/libObeliskMediaRemoteNative.dylib")
+        candidates.append("/Applications/Obelisk.app/Contents/MacOS/libObeliskMediaRemoteNative.dylib")
+
+        // 5. Development build path
+        let devBuild = URL(fileURLWithPath: #file)
+            .deletingLastPathComponent() // Media
+            .deletingLastPathComponent() // Pages
+            .deletingLastPathComponent() // Obelisk
+            .deletingLastPathComponent() // Sources
+            .appendingPathComponent(".build/out/Products/Release/libObeliskMediaRemoteNative.dylib")
+        candidates.append(devBuild.path)
+        candidates.append(".build/out/Products/Release/libObeliskMediaRemoteNative.dylib")
+
+        for path in candidates {
+            if fm.isReadableFile(atPath: path) {
+                return path
+            }
+        }
+        return nil
+    }
+
     private func startSidecar() {
         stopSidecar()
-        writeSidecarScript()
 
+        guard consecutiveSilentLaunches < 5 else {
+            isAvailable = false
+            return
+        }
+        consecutiveSilentLaunches += 1
+
+        let fm = FileManager.default
         let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
-        proc.arguments = [sidecarScriptPath]
-
         let inPipe = Pipe()
         let outPipe = Pipe()
         proc.standardInput = inPipe
@@ -477,11 +531,41 @@ RunLoop.main.run()
             }
         }
 
+        // Strategy 1: Precompiled Native dylib via macOS platform perl (100% zero Xcode/CLT dependency)
+        if let dylibPath = locateDylib(), fm.isExecutableFile(atPath: "/usr/bin/perl") {
+            let escapedPath = dylibPath.replacingOccurrences(of: "'", with: "\\'")
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+            proc.arguments = [
+                "-e",
+                "use strict; use DynaLoader; my $l = DynaLoader::dl_load_file('\(escapedPath)', 0) or die qq{Cannot load: $!\\n}; my $s = DynaLoader::dl_find_symbol($l, 'run_obelisk_mediaremote_sidecar') or die qq{No sym\\n}; my $f = DynaLoader::dl_install_xsub('main::run', $s); main::run();"
+            ]
+            do {
+                try proc.run()
+                self.sidecarProcess = proc
+                self.stdinPipe = inPipe
+                self.stdoutPipe = outPipe
+                self.isAvailable = true
+                return
+            } catch {
+                // If perl execution fails, fall through to Strategy 2
+            }
+        }
+
+        // Strategy 2: Swift sidecar script (on developer Macs with Xcode or Command Line Tools)
+        guard SwiftToolchainProbe.isAvailable else {
+            isAvailable = false
+            return
+        }
+        writeSidecarScript()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
+        proc.arguments = [sidecarScriptPath]
+
         do {
             try proc.run()
             self.sidecarProcess = proc
             self.stdinPipe = inPipe
             self.stdoutPipe = outPipe
+            self.isAvailable = true
         } catch {
             self.isAvailable = false
         }
@@ -557,6 +641,8 @@ RunLoop.main.run()
 
         stateLock.lock()
         self.latestPlayers = parsed
+        self.lastPayloadDate = Date()
+        self.consecutiveSilentLaunches = 0
         stateLock.unlock()
 
         Task { @MainActor in
@@ -623,4 +709,34 @@ RunLoop.main.run()
     public func setElapsedTime(_ seconds: Double, targetKey: String? = nil) {
         sendSidecarCommand(targetKey: targetKey, command: 24, parameter: seconds)
     }
+}
+
+
+/// Detects whether a usable Swift toolchain exists. `/usr/bin/swift` is only a shim on a clean macOS install.
+public enum SwiftToolchainProbe {
+    public static let isAvailable: Bool = {
+        // Debug switch to simulate a clean Mac: OBELISK_DISABLE_SIDECAR=1
+        if ProcessInfo.processInfo.environment["OBELISK_DISABLE_SIDECAR"] == "1" { return false }
+        let fm = FileManager.default
+        guard fm.isExecutableFile(atPath: "/usr/bin/swift") else { return false }
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
+        proc.arguments = ["-p"]
+        let out = Pipe()
+        proc.standardOutput = out
+        proc.standardError = FileHandle.nullDevice
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+            guard proc.terminationStatus == 0 else { return false }
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            let path = (String(data: data, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !path.isEmpty else { return false }
+            // Command Line Tools: <path>/usr/bin/swift. Full Xcode: <path>/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift.
+            return fm.isExecutableFile(atPath: path + "/usr/bin/swift")
+                || fm.isExecutableFile(atPath: path + "/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift")
+        } catch {
+            return false
+        }
+    }()
 }

@@ -7,13 +7,21 @@ let package = Package(
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "Obelisk", targets: ["Obelisk"])
+        .executable(name: "Obelisk", targets: ["Obelisk"]),
+        .library(name: "ObeliskMediaRemoteNative", type: .dynamic, targets: ["ObeliskMediaRemoteNative"])
     ],
     targets: [
+        .target(
+            name: "ObeliskMediaRemoteNative",
+            path: "Sources/ObeliskMediaRemoteNative",
+            publicHeadersPath: "include"
+        ),
         .executableTarget(
             name: "Obelisk",
+            dependencies: [
+                "ObeliskMediaRemoteNative"
+            ],
             path: "Sources/Obelisk"
         )
     ]
 )
-

@@ -133,7 +133,7 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
             } else if lower.contains("jakarta utara") || lower.contains("north jakarta") {
                 return "North Jakarta"
             } else if lower.contains("tangerang selatan") || lower.contains("south tangerang") {
-                return "South Jakarta"
+                return "South Tangerang"
             } else if lower != "jakarta" {
                 let clean = subAdmin
                     .replacingOccurrences(of: "Kota Administrasi ", with: "")
@@ -148,9 +148,6 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
 
         if let locality = placemark.locality, !locality.isEmpty {
             let lower = locality.lowercased()
-            if lower.contains("tangerang") {
-                return "South Jakarta"
-            }
             if lower == "jakarta" || lower.contains("jakarta") {
                 if let subLoc = placemark.subLocality, !subLoc.isEmpty {
                     let subLower = subLoc.lowercased()
@@ -274,8 +271,8 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
             }
         }
 
-        // 3. Third priority: Known saved coordinate if not contaminated by ISP Tangerang
-        if lastKnownCoordinate != nil, let city = lastKnownCity, !city.isEmpty, !city.lowercased().contains("tangerang") {
+        // 3. Third priority: Known saved coordinate
+        if lastKnownCoordinate != nil, let city = lastKnownCity, !city.isEmpty {
             fetchWeather()
             return
         }
@@ -358,12 +355,6 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
                 lon = 106.8227
                 city = lastKnownCity ?? "South Jakarta"
                 isDevice = true
-            }
-
-            if city.lowercased().contains("tangerang") {
-                city = "South Jakarta"
-                self.lastKnownCity = "South Jakarta"
-                UserDefaults.standard.set("South Jakarta", forKey: "weather_city")
             }
         }
 
@@ -593,6 +584,7 @@ public final class WeatherService: NSObject, ObservableObject, CLLocationManager
     }
 
     private nonisolated static func runAppleWeatherFetcher(lat: Double, lon: Double, city: String, isDevice: Bool) -> Data? {
+        guard SwiftToolchainProbe.isAvailable else { return nil }
         ensureScriptExists()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
@@ -690,9 +682,6 @@ guard args.count >= 3,
 let rawCity = args.count >= 4 ? args[3] : "South Jakarta"
 let isDevice = args.count >= 5 ? (args[4] == "true" || args[4] == "1") : true
 var city = (rawCity.isEmpty || rawCity.lowercased() == "jakarta" || rawCity == "Current Location") ? "South Jakarta" : rawCity
-if city.lowercased().contains("tangerang") {
-    city = "South Jakarta"
-}
 
 let sema = DispatchSemaphore(value: 0)
 

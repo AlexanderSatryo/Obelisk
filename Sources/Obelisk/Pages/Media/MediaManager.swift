@@ -41,6 +41,7 @@ public final class MediaManager: ObservableObject {
         setupTerminationObserver()
         _ = MediaArtworkService.shared
         _ = MediaRemoteBridge.shared
+        DirectPlayerFallback.shared.start()
     }
 
     // MARK: - Safe App State Checkers

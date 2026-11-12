@@ -24,6 +24,8 @@ public final class RealNotificationMonitor: ObservableObject {
 
     private var lastCapturedSignature: String = ""
     private var lastCapturedTime: Date = .distantPast
+    private var hasCapturedInitialBanners: Bool = false
+    private var seenBannerSignatures: [String: Date] = [:]
 
     private var recentDeliveredIdents: [String: Date] = [:]
     private var recentMatchedWhatsAppSignatures: [String: Date] = [:]
@@ -57,7 +59,7 @@ public final class RealNotificationMonitor: ObservableObject {
         isAccessibilityTrusted = AXIsProcessTrusted()
         if !isAccessibilityTrusted && !hasPromptedAccessibilityThisSession {
             hasPromptedAccessibilityThisSession = true
-            requestAccessibilityPermission(resetTCC: true)
+            requestAccessibilityPermission()
         }
 
         // Capture initial WhatsApp baseline once and backfill any placeholder notifications
@@ -110,14 +112,7 @@ public final class RealNotificationMonitor: ObservableObject {
     }
 
     /// Prompts macOS to grant Accessibility permission to Obelisk so banner message bodies can be read.
-    public func requestAccessibilityPermission(resetTCC: Bool = false) {
-        if resetTCC && !AXIsProcessTrusted() {
-            let resetProc = Process()
-            resetProc.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
-            resetProc.arguments = ["reset", "Accessibility", "com.alxstry.obelisk"]
-            try? resetProc.run()
-            resetProc.waitUntilExit()
-        }
+    public func requestAccessibilityPermission() {
         let promptKey = "AXTrustedCheckOptionPrompt" as CFString
         let options = [promptKey: true] as CFDictionary
         isAccessibilityTrusted = AXIsProcessTrustedWithOptions(options)
@@ -289,6 +284,7 @@ public final class RealNotificationMonitor: ObservableObject {
             }
             scanElement(window)
         }
+        hasCapturedInitialBanners = true
     }
 
     private func scanElement(_ element: AXUIElement) {
@@ -486,7 +482,9 @@ public final class RealNotificationMonitor: ObservableObject {
         if let idx = pendingIdx {
             let deliveryID = pendingDeliveries[idx].id
             pendingDeliveries[idx].enrichedWithBannerText = true
-            lastCapturedSignature = "\(resolvedAppName)|\(sender)|\(message)"
+            let sig = "\(resolvedAppName)|\(sender)|\(message)"
+            seenBannerSignatures[sig] = now
+            lastCapturedSignature = sig
             lastCapturedTime = now
 
             NotificationService.shared.enrichNotification(
@@ -501,10 +499,22 @@ public final class RealNotificationMonitor: ObservableObject {
         }
 
         let signature = "\(resolvedAppName)|\(sender)|\(message)"
-        guard signature != lastCapturedSignature || now.timeIntervalSince(lastCapturedTime) > 6.0 else {
+
+        // Baseline: If this is the initial scan on startup, mark existing banners as seen without posting
+        if !hasCapturedInitialBanners {
+            seenBannerSignatures[signature] = now
             return false
         }
 
+        // De-duplicate: Never re-post an already seen banner from Notification Center
+        if let lastSeen = seenBannerSignatures[signature], now.timeIntervalSince(lastSeen) < 1800.0 {
+            return false
+        }
+        guard signature != lastCapturedSignature else {
+            return false
+        }
+
+        seenBannerSignatures[signature] = now
         lastCapturedSignature = signature
         lastCapturedTime = now
 
@@ -677,13 +687,15 @@ public final class RealNotificationMonitor: ObservableObject {
         var roots: [AXUIElement] = []
         var mainWinRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(axApp, kAXMainWindowAttribute as CFString, &mainWinRef) == .success,
-           let mainWin = mainWinRef {
-            roots.append(mainWin as! AXUIElement)
+           let mainWin = mainWinRef,
+           CFGetTypeID(mainWin) == AXUIElementGetTypeID() {
+            roots.append(unsafeBitCast(mainWin, to: AXUIElement.self))
         }
         var focusedWinRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(axApp, kAXFocusedWindowAttribute as CFString, &focusedWinRef) == .success,
-           let focusedWin = focusedWinRef {
-            roots.append(focusedWin as! AXUIElement)
+           let focusedWin = focusedWinRef,
+           CFGetTypeID(focusedWin) == AXUIElementGetTypeID() {
+            roots.append(unsafeBitCast(focusedWin, to: AXUIElement.self))
         }
         var windowsRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,

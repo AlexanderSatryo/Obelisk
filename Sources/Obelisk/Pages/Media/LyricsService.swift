@@ -27,6 +27,10 @@ public final class LyricsService: ObservableObject {
     private var basePosition: Double = 0
     private var lastSyncDate: Date = Date()
     private var isCurrentlyPlaying: Bool = false
+    /// Set once a lookup for `currentTrackKey` finished without a result, so we do not hammer LRCLIB every tick.
+    private var settledWithoutLyrics: Bool = false
+    private var lastNetworkFailure: Date = .distantPast
+    private var lastAttempt: Date = .distantPast
 
     /// Dynamic lead-in offset in seconds to match the spring scroll transition right on the vocal attack
     public var lyricLeadInOffset: Double {
@@ -43,24 +47,37 @@ public final class LyricsService: ObservableObject {
         }
 
         let trackKey = "\(track.artist.lowercased()) - \(track.title.lowercased())"
-        if trackKey == currentTrackKey && (!lines.isEmpty || isLoading) {
-            return
+        if trackKey == currentTrackKey {
+            if !lines.isEmpty || isLoading { return }
+            // Not found: stay quiet. Network failure: retry no more often than every 15 seconds.
+            if settledWithoutLyrics { return }
+            if Date().timeIntervalSince(lastNetworkFailure) < 15 { return }
         }
 
         currentTrackKey = trackKey
         isLoading = true
         hasLyrics = false
+        settledWithoutLyrics = false
+        lastAttempt = Date()
 
         Task { [weak self] in
-            let lyricsData = await LyricsService.fetchFromLRCLIB(
+            let outcome = await LyricsService.fetchFromLRCLIB(
                 title: track.title,
                 artist: track.artist,
                 album: track.album,
                 duration: track.duration
             )
+            let lyricsData = outcome.data
 
             guard let self = self, self.currentTrackKey == trackKey else { return }
             self.isLoading = false
+            if lyricsData.lines.isEmpty {
+                if outcome.networkFailed {
+                    self.lastNetworkFailure = Date()
+                } else {
+                    self.settledWithoutLyrics = true
+                }
+            }
             self.lines = lyricsData.lines
             self.hasLyrics = !lyricsData.lines.isEmpty
 
@@ -84,8 +101,15 @@ public final class LyricsService: ObservableObject {
         }
     }
 
+    public func clearLyricsIfNeeded() {
+        guard !currentTrackKey.isEmpty || hasLyrics || !lines.isEmpty || isLoading else { return }
+        clearLyrics()
+    }
+
     public func clearLyrics() {
         stopInterpolationTimer()
+        settledWithoutLyrics = false
+        lastNetworkFailure = .distantPast
         currentTrackKey = ""
         lines = []
         activeLineIndex = 0
@@ -187,54 +211,77 @@ public final class LyricsService: ObservableObject {
     }
 
     // MARK: - LRCLIB API Request & Unified Candidate Pool Scoring
-    private static func fetchFromLRCLIB(title: String, artist: String, album: String, duration: Double) async -> LyricsData {
-        guard let encodedTitle = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let encodedArtist = artist.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-            return .empty
+    private static func cleanedTitle(_ title: String) -> String {
+        var t = title
+        for pattern in ["\\s*\\(.*?\\)", "\\s*\\[.*?\\]", "\\s+-\\s+(Remaster(ed)?|Live|Single|Radio Edit|Mono|Stereo|Version|Deluxe).*$", "\\s+feat\\..*$", "\\s+ft\\..*$"] {
+            t = t.replacingOccurrences(of: pattern, with: "", options: [.regularExpression, .caseInsensitive])
+        }
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func fetchJSON(_ urlString: String, timeout: TimeInterval) async -> (json: Any?, failed: Bool) {
+        guard let url = URL(string: urlString) else { return (nil, false) }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = timeout
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.setValue("Obelisk-macOS/1.1.1 (https://github.com/AlexanderSatryo/Obelisk)", forHTTPHeaderField: "User-Agent")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else { return (nil, true) }
+            if http.statusCode == 200 {
+                return (try? JSONSerialization.jsonObject(with: data), false)
+            }
+            // 404 means "no such track"; anything else (429, 5xx) is transient.
+            return (nil, http.statusCode != 404)
+        } catch {
+            return (nil, true)
+        }
+    }
+
+    // MARK: - LRCLIB API Request & Unified Candidate Pool Scoring
+    private static func fetchFromLRCLIB(title: String, artist: String, album: String, duration: Double) async -> (data: LyricsData, networkFailed: Bool) {
+        func enc(_ s: String) -> String {
+            s.addingPercentEncoding(withAllowedCharacters: .urlQueryValueAllowed) ?? s
         }
 
         var candidates: [[String: Any]] = []
+        var failures = 0
+        var requests = 0
 
-        // 1. Query /api/search to gather all available versions (including exact streaming-synced uploads)
-        let searchString = "https://lrclib.net/api/search?q=\(encodedArtist)%20\(encodedTitle)"
-        if let searchUrl = URL(string: searchString) {
-            var searchReq = URLRequest(url: searchUrl)
-            searchReq.timeoutInterval = 7
-            searchReq.setValue("Obelisk-macOS/1.0", forHTTPHeaderField: "User-Agent")
+        // 1. Query /api/search to gather all available versions
+        let search = await fetchJSON("https://lrclib.net/api/search?q=\(enc(artist + " " + title))", timeout: 8)
+        requests += 1
+        if search.failed { failures += 1 }
+        if let array = search.json as? [[String: Any]] { candidates.append(contentsOf: array) }
 
-            if let (data, response) = try? await URLSession.shared.data(for: searchReq),
-               let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
-               let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                candidates.append(contentsOf: array)
-            }
-        }
-
-        // 2. Also query /api/get (with album + duration) and add to candidate pool if not already present
+        // 2. Exact lookup with album + duration
         let durationParam = duration > 0 ? "&duration=\(Int(duration.rounded()))" : ""
-        var albumParam = ""
-        if !album.isEmpty, let encodedAlbum = album.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-            albumParam = "&album_name=\(encodedAlbum)"
+        let albumParam = album.isEmpty ? "" : "&album_name=\(enc(album))"
+        let exact = await fetchJSON(
+            "https://lrclib.net/api/get?track_name=\(enc(title))&artist_name=\(enc(artist))\(albumParam)\(durationParam)",
+            timeout: 6
+        )
+        requests += 1
+        if exact.failed { failures += 1 }
+        if let json = exact.json as? [String: Any] { candidates.append(json) }
+
+        // 3. Nothing found: retry with a cleaned title ("Song (Remastered 2011)" -> "Song")
+        let simple = cleanedTitle(title)
+        if candidates.isEmpty, !simple.isEmpty, simple.lowercased() != title.lowercased() {
+            let retry = await fetchJSON("https://lrclib.net/api/search?q=\(enc(artist + " " + simple))", timeout: 8)
+            requests += 1
+            if retry.failed { failures += 1 }
+            if let array = retry.json as? [[String: Any]] { candidates.append(contentsOf: array) }
         }
 
-        let getURLString = "https://lrclib.net/api/get?track_name=\(encodedTitle)&artist_name=\(encodedArtist)\(albumParam)\(durationParam)"
-        if let url = URL(string: getURLString) {
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 5
-            request.setValue("Obelisk-macOS/1.0", forHTTPHeaderField: "User-Agent")
-            if let (data, response) = try? await URLSession.shared.data(for: request),
-               let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                candidates.append(json)
-            }
-        }
-
-        return selectBestCandidate(
+        let result = selectBestCandidate(
             from: candidates,
             targetTitle: title,
             targetArtist: artist,
             targetAlbum: album,
             targetDuration: duration
         )
+        return (result, result.lines.isEmpty && failures > 0 && failures == requests)
     }
 
     private static func selectBestCandidate(
@@ -368,4 +415,13 @@ public final class LyricsService: ObservableObject {
             LyricLine(time: Double(index * 4), text: text)
         }
     }
+}
+
+private extension CharacterSet {
+    /// Like `.urlQueryAllowed` but also escapes `&`, `+`, `=` and `?` so titles such as "Rock & Roll" stay intact.
+    static let urlQueryValueAllowed: CharacterSet = {
+        var set = CharacterSet.urlQueryAllowed
+        set.remove(charactersIn: "&+=?#")
+        return set
+    }()
 }

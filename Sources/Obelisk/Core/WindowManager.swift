@@ -63,7 +63,7 @@ public final class WindowManager: ObservableObject {
     private var outsideTickCount: Int = 0
     private var lastExpandTime: Date = .distantPast
     private var lastCollapseTime: Date = .distantPast
-    private var isCollapsing: Bool = false
+    @Published public var isCollapsing: Bool = false
 
     private init() {
         self.compactWidth = ScreenGeometry.notchSize.width
