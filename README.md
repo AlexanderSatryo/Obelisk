@@ -73,14 +73,12 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
 ## Release History
 
 ### Version 1.1.2 (Latest)
-- **Apple Control Center Liquid Glass**: Real behind-window frosted optical blur (`NSVisualEffectView`) with 3D lens specular sheen, subtle border refraction, and separated sliders for glass blur density and body opacity.
-- **Xcode-Free Universal Media Engine**: Native compiled media remote engine and fallback scripts enabling Spotify, Apple Music, and browser playback controls and synchronized lyrics on all Macs without Xcode installed.
-- **Redesigned macOS Preferences**: Elegant System Settings sidebar layout with anchored 236 pt width, removing UI clutter and arrows.
-- **Precision Live Notch Preview**: Live preview accurately mirrors real notch tabs, accent dots, and battery status with real-time responsive scaling for the Expanded Width slider.
-- **Notch Collapse Animation Polish**: Eliminated outline ghosting, premature black boxes, and lingering shadows when collapsing from expanded to compact standby.
-- **Standard Settings Window Layering**: Preferences window now runs at standard macOS window level (`.normal`), allowing other applications and browser tabs to be clicked without obstruction.
-- **Color Brightness Control**: Fixed brightness slider in Appearance settings so it dynamically brightens or dims the notch and preview elements.
-- **Standby HUD Loop Fix**: Resolved persistent standby notification loop occurring on clean installations.
+- **Apple Liquid Glass**: Authentic frosted glass with blur density and opacity controls for both compact notch and expanded dashboard.
+- **Universal Media & Lyrics**: Full playback controls and synchronized lyrics for Spotify, Apple Music, and browsers without requiring Xcode.
+- **Redesigned Settings**: Clean macOS System Settings layout with live notch preview, real-time width scaling, and working brightness slider.
+- **Smooth Notch Animation**: Fixed outline shadow and ghosting artifacts when closing the expanded notch.
+- **Window Layering**: Preferences window now stays behind active apps instead of floating on top.
+- **Bug Fixes**: Resolved recurring standby alerts on new installations and improved overall stability.
 
 ### Version 1.1.1
 - **Scheduled Alerts and Routine Alarms**: Dedicated dashboard tab with recurring routines (Daily, Weekdays, Weekends, One-time), tactile time controls, and standby notch alert HUD with animated swinging bell and OK button.
