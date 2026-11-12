@@ -123,13 +123,23 @@ All preferences are managed by the `@MainActor` singleton `ObeliskSettings.share
 ### Category 1: Appearance
 | Setting Property | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `surfaceStyle` | `NotchSurfaceStyle` | `.pitchBlack` | `.pitchBlack` (100% solid OLED black), `.frostedGlass` (translucent dark charcoal), or `.ambientGlow` (dynamic source-tinted aura and border). |
+| `compactSurfaceStyle` | `NotchSurfaceStyle` | `.pitchBlack` | Standby notch material: `.pitchBlack` (OLED black merging with MacBook bezel), `.liquidGlass` (Apple Control Center optical glass), `.darkGlass`, `.frostedGlass`, or `.ambientGlow`. |
+| `compactGlassBlur` | `Double` | `0.75` | Optical behind-window blur density and frosted dispersion for the compact notch (`0.10` to `1.00`). |
+| `compactOpacity` | `Double` | `1.00` | Translucency and body darkness of the standby notch (`0.15` to `1.00`). |
+| `expandedSurfaceStyle` | `NotchSurfaceStyle` | `.liquidGlass` | Expanded dashboard material: `.liquidGlass`, `.pitchBlack`, `.darkGlass`, `.frostedGlass`, or `.ambientGlow`. |
+| `expandedGlassBlur` | `Double` | `0.75` | Optical behind-window blur density for the expanded dashboard (`0.10` to `1.00`). |
+| `expandedOpacity` | `Double` | `0.75` | Body translucency and glass darkness for the expanded dashboard (`0.15` to `1.00`). |
 | `showBorder` | `Bool` | `true` | Enables or disables the hairline rim border (`UnderNotchBorder`). |
 | `borderWidth` | `Double` | `0.8` | Rim border stroke thickness (`0.5 pt` to `2.0 pt`). |
 | `borderOpacity` | `Double` | `0.12` | Rim border stroke opacity (`4%` to `40%`). |
 | `compactCornerRadius` | `Double` | `14.0` | Bottom corner curvature when collapsed (`8 pt` to `18 pt`). |
+| `compactTopCornerRadius` | `Double` | `6.0` | Top ear curvature meeting display bezel when collapsed (`0 pt` to `16 pt`). |
 | `expandedCornerRadius` | `Double` | `18.0` | Bottom corner curvature when expanded (`12 pt` to `26 pt`). |
-| `expandedWidthPreset` | `ExpandedWidthPreset` | `.standard` | `.compact` (`440 pt`), `.standard` (`480 pt`), or `.wide` (`512 pt`). |
+| `expandedTopCornerRadius` | `Double` | `8.0` | Top ear curvature meeting display bezel when expanded (`0 pt` to `20 pt`). |
+| `expandedWidth` | `Double` | `620.0` | Custom dashboard width in points (`560 pt` to `760 pt`). |
+| `expandedHeightOffset` | `Double` | `0.0` | Vertical height adjustment for dashboard pages (`-24 pt` to `+100 pt`). |
+| `colorTheme` | `NotchColorTheme` | `.colorful` | Accent color engine preset: `.monochrome`, `.colorful`, or `.soft`. |
+| `colorBrightness` | `Double` | `1.0` | Brightness and vibrancy scaling factor (`0.5` to `1.5`). |
 | `topNotchClearanceOffset` | `Double` | `0.0` | Fine-tunes vertical clearance below the physical MacBook Pro notch (`-4 pt` to `+10 pt`). |
 | `compactWingMode` | `CompactWingMode` | `.dynamicAuto` | `.dynamicAuto` (widens when media active), `.alwaysMinimal` (locked to hardware notch width), or `.alwaysWide` (persistent wings). |
 | `leftWingContent` | `LeftWingContentMode` | `.artworkOrLogo` | `.artworkOrLogo`, `.sourceLogoOnly`, `.weatherMini`, or `.hidden`. |

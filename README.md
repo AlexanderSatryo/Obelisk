@@ -1,29 +1,31 @@
 # Obelisk — Native Dynamic Island for macOS
 
-Obelisk is a native macOS application for Apple Silicon MacBooks (as well as external monitors) that turns the notch area into an interactive Dynamic Island. It provides media playback controls, synchronized lyrics, incoming notification alerts with Touch ID privacy, a file drop shelf, active download tracking, weather forecasts, calendar events, and system status indicators.
+Obelisk is a native macOS application for Apple Silicon MacBooks (as well as external monitors) that turns the notch area into an interactive Dynamic Island. It provides media playback controls, synchronized lyrics, incoming notification alerts with Touch ID privacy, a file drop shelf, active download tracking, weather forecasts, calendar events, routine alarms, and system status indicators.
 
 ---
 
-## Features (v1.1.1)
+## Features (v1.1.2)
 
-1. **Notch Display and Customization**
+1. **Notch Display and Liquid Glass Material**
    - Automatically detects and aligns with native MacBook notch dimensions (and simulates on external displays).
-   - Expand and collapse smoothly via hover, click, or trackpad gestures.
+   - Expand and collapse smoothly via hover, click, or trackpad gestures with zero-lag GPU morphing.
+   - **Apple Control Center-Style Liquid Glass**: Authentic behind-window optical frosted blur with 3D lens specular sheen and subtle edge refraction.
    - Independent Appearance controls in Settings:
-     - **Compact Notch**: Customize standby width (40 to 380 pt) with live preview and centered side content.
-     - **Expanded Dashboard**: Configure layout dimensions and animation parameters.
+     - **Compact Notch**: Independent material selection (Pitch Black, Liquid Glass, Dark Glass, Frosted Glass, Ambient Glow) with separate blur density and opacity sliders, and customizable standby width (40 to 380 pt).
+     - **Expanded Dashboard**: Configure expanded material, blur, opacity, hairline rim border, width (560 to 760 pt), height offset, top corner radius, and bottom corner radius.
    - Horizontal multi-page swipe navigation with natural gesture direction enabled by default.
 
-2. **Incoming Notifications and Touch ID Privacy**
+2. **Universal Media Player and Synchronized Lyrics (No Xcode Required)**
+   - Operates on any Mac out-of-the-box without requiring Xcode or Apple Developer Command Line Tools.
+   - Integrates with Spotify, Apple Music, YouTube, and media-playing browsers.
+   - Displays track title, artist name, live album artwork, and interactive scrubber.
+   - Real-time synchronized lyrics scrolling with playback timing across all Mac devices.
+   - Audio output selector for rapid switching between built-in speakers, AirPods, and Bluetooth devices.
+
+3. **Incoming Notifications and Touch ID Privacy**
    - Displays real-time notification banners (WhatsApp, Messages, Slack, Telegram, etc.) directly in the notch.
    - Biometric privacy protection: Private message contents unlock with Touch ID, featuring an illuminated green fingerprint glyph and sonar ripple animation.
    - Built-in notification history tab to review recent alerts and open originating apps in one click.
-
-3. **Media Player and Synchronized Lyrics**
-   - Integrates with Spotify, Apple Music, YouTube, and media-playing browsers.
-   - Displays track title, artist name, live album artwork, and interactive scrubber.
-   - Real-time synchronized lyrics scrolling with playback timing.
-   - Audio output selector for rapid switching between built-in speakers, AirPods, and Bluetooth devices.
 
 4. **File Tray and Direct Drag Interaction**
    - Dragging any file or folder toward the notch automatically opens the File Tray page.
@@ -48,11 +50,18 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
    - Standby Notch Alert HUD featuring an animated swinging bell and time badge on the left wing, and reminder title + amber `[ OK ]` confirmation button on the right wing.
    - Configurable standby alert duration (1, 2, 3, 5, 10 minutes, or until dismissed) and "Require OK to Dismiss" toggle in Settings (`Modules` > `SCHEDULED ALERTS & ALARMS`).
 
-8. **Native macOS Shortcut Integration**
+8. **Redesigned macOS Preferences & 100% Precision Live Preview**
+   - Modeled after macOS System Settings with an anchored, shift-free 236 pt sidebar.
+   - Real-time Bezel Simulator Live Preview mirroring exact floating tabs, accent dots, battery telemetry, and camera actions.
+   - Dynamic real-time canvas scaling when adjusting the `Expanded Width` slider.
+   - Working `Color Brightness` slider adjusting notch vibrancy and lighting across all visual modules.
+   - Standard window layering: Preferences window never permanently floats over or blocks other applications.
+
+9. **Native macOS Shortcut Integration**
    - Full support for standard macOS editing shortcuts (`⌘ + C`, `⌘ + V`, `⌘ + A`, `⌘ + X`, `⌘ + Z`, `⇧ + ⌘ + Z`) across all text fields and input forms in the application.
    - Operates seamlessly within the custom floating notch window environment without requiring traditional system menu bar edit items.
 
-9. **System Indicators and Native HUD Replacement**
+10. **System Indicators and Native HUD Replacement**
    - **Native macOS OSD Interception**: Suppresses standard floating pop-up overlays for volume and brightness, rendering them smoothly inside the notch instead.
    - **Smart Audio Output Recognition**: Distinguishes between headphones (earbuds, AirPods, headsets) and speakers (built-in speakers, Bluetooth speakers, external audio) with tailored icons and displays the active device name.
    - **Flicker-Free HUD Slider**: Smooth fluid slider transitions during repeated keystrokes with zero view blinking or notch jitter.
@@ -63,7 +72,17 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
 
 ## Release History
 
-### Version 1.1.1 (Latest)
+### Version 1.1.2 (Latest)
+- **Apple Control Center Liquid Glass**: Real behind-window frosted optical blur (`NSVisualEffectView`) with 3D lens specular sheen, subtle border refraction, and separated sliders for glass blur density and body opacity.
+- **Xcode-Free Universal Media Engine**: Native compiled media remote engine and fallback scripts enabling Spotify, Apple Music, and browser playback controls and synchronized lyrics on all Macs without Xcode installed.
+- **Redesigned macOS Preferences**: Elegant System Settings sidebar layout with anchored 236 pt width, removing UI clutter and arrows.
+- **Precision Live Notch Preview**: Live preview accurately mirrors real notch tabs, accent dots, and battery status with real-time responsive scaling for the Expanded Width slider.
+- **Notch Collapse Animation Polish**: Eliminated outline ghosting, premature black boxes, and lingering shadows when collapsing from expanded to compact standby.
+- **Standard Settings Window Layering**: Preferences window now runs at standard macOS window level (`.normal`), allowing other applications and browser tabs to be clicked without obstruction.
+- **Color Brightness Control**: Fixed brightness slider in Appearance settings so it dynamically brightens or dims the notch and preview elements.
+- **Standby HUD Loop Fix**: Resolved persistent standby notification loop occurring on clean installations.
+
+### Version 1.1.1
 - **Scheduled Alerts and Routine Alarms**: Dedicated dashboard tab with recurring routines (Daily, Weekdays, Weekends, One-time), tactile time controls, and standby notch alert HUD with animated swinging bell and OK button.
 - **Native macOS Shortcut Integration**: Full support for standard macOS editing shortcuts (`⌘ + C`, `⌘ + V`, `⌘ + A`, `⌘ + X`, `⌘ + Z`, `⇧ + ⌘ + Z`) across all text fields and input forms in the application.
 - **Notification Clipping Fix**: Fixed an issue where collapsing the notch while an incoming alert arrived could clip the notification text. Dynamic wing expansion now expands smoothly up to 280 pt with symmetric morphing.
@@ -94,7 +113,9 @@ Obelisk is a native macOS application for Apple Silicon MacBooks (as well as ext
 ### 1. Download .dmg
 Download the latest **`Obelisk.dmg`** installer directly from GitHub Releases:
 
-**[Download Obelisk.dmg (v1.1.1)](https://github.com/AlexanderSatryo/Obelisk/releases/latest/download/Obelisk.dmg)**
+**[Download Obelisk.dmg (v1.1.2)](https://github.com/AlexanderSatryo/Obelisk/releases/latest/download/Obelisk.dmg)**
+
+*SHA-256 Checksum: `4ba2cd764d50df8e22b1b76e6d6441955d19d62fdcc64e7c311ef8ed5f71cf82`*
 
 ### 2. Install to Applications
 1. Double-click the downloaded **`Obelisk.dmg`** file.
@@ -139,6 +160,10 @@ Obelisk/
 ├── Documentation.md
 ├── Obelisk.dmg
 └── Sources/
+    ├── ObeliskMediaRemoteNative/
+    │   ├── ObeliskMediaRemoteNative.m
+    │   └── include/
+    │       └── ObeliskMediaRemoteNative.h
     └── Obelisk/
         ├── App/
         │   ├── Main.swift
@@ -149,6 +174,7 @@ Obelisk/
         │   └── WindowManager.swift
         ├── UI/
         │   ├── NotchShape.swift
+        │   ├── NotchLiquidGlassSurface.swift
         │   ├── CompactNotchView.swift
         │   ├── ExpandedNotchView.swift
         │   ├── NotchPageView.swift
@@ -165,6 +191,7 @@ Obelisk/
         │   │   ├── MediaManager.swift
         │   │   ├── MediaPlayerView.swift
         │   │   ├── MediaRemoteBridge.swift
+        │   │   ├── DirectPlayerFallback.swift
         │   │   ├── MediaArtworkService.swift
         │   │   ├── LyricsService.swift
         │   │   ├── LyricsModel.swift
