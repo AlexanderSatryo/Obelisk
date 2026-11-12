@@ -113,8 +113,6 @@ Download the latest **`Obelisk.dmg`** installer directly from GitHub Releases:
 
 **[Download Obelisk.dmg (v1.1.2)](https://github.com/AlexanderSatryo/Obelisk/releases/latest/download/Obelisk.dmg)**
 
-*SHA-256 Checksum: `4ba2cd764d50df8e22b1b76e6d6441955d19d62fdcc64e7c311ef8ed5f71cf82`*
-
 ### 2. Install to Applications
 1. Double-click the downloaded **`Obelisk.dmg`** file.
 2. Drag the **`Obelisk`** icon into the **`Applications`** folder.
